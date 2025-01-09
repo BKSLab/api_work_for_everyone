@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  app:
+    container_name: api_service_main
+    build: .
+    # env_file: .env
+    restart: on-failure
+    command: bash entrypoint.sh
+    ports:
+      - "8000:8000"
