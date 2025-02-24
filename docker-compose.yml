@@ -1,11 +1,48 @@
-version: "3.9"
+version: '3.7'
+
+volumes:
+  pg_bot_data:
 
 services:
-  app:
+  db:
+    container_name: db_api_container
+    image: postgres:16-alpine3.19
+    env_file: .env
+    restart: always
+    volumes:
+      - pg_bot_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+      # - "54321:5432"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=50"
+      - "-c"
+      - "shared_buffers=250MB"
+    deploy:
+      resources:
+        limits:
+          memory: 2GB
+
+  api_service:
     container_name: api_service_main
     build: .
-    # env_file: .env
+    env_file: .env
     restart: on-failure
     command: bash entrypoint.sh
     ports:
       - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 2GB
+    depends_on:
+      db:
+        condition: service_healthy
