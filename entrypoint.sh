@@ -1,7 +1,9 @@
-# Указываем путь к src, чтобы Python правильно искал модули
-export PYTHONPATH=/app/src
+#!/bin/bash
 
-# Создаем БД перед запуском приложения
-python -m src.db.create_db
+set -e
 
-python -m src.main
+echo "application of migrations"
+alembic upgrade head
+
+echo "Starting in production mode..."
+exec hypercorn app.main:app --bind 0.0.0.0:8000 --workers 1
