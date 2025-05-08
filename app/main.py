@@ -21,13 +21,14 @@ async def lifespan(app: FastAPI):
                 region_repository=RegionRepository(db_session=db_session)
             )
             await region_service.preload_region_data_if_empty()
-        yield
     except RegionDataLoadError as error:
         logger.critical(
             f'An error occurred while loading region data: {error}.'
             'The application will be stopped.'
         )
         raise
+    yield
+    logger.info(">>> Lifespan FINISHED <<<")
 
 app = FastAPI(lifespan=lifespan)
 
