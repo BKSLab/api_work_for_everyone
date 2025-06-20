@@ -3,7 +3,10 @@ from fastapi.concurrency import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exceptions.custom_exceptions import RegionDataLoadError
+from api.v1 import router as v1_router
+
+from exceptions.service_exceptions import RegionDataLoadError
+from dependencies.services import check_db_connection
 from services.region_service import RegionService
 from repositories.region_repository import RegionRepository
 from db.session import async_session_factory
@@ -13,24 +16,26 @@ from core.config_logger import logger
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Функция управления жизненным циклом приложения."""
-    logger.info(">>> Lifespan STARTED <<<")
+    logger.info('>>> Lifespan STARTED <<<')
     try:
         async with async_session_factory() as db_session:
             db_session: AsyncSession
+            if not await check_db_connection(db_session):
+                raise RuntimeError('Database connection test failed')
             region_service = RegionService(
                 region_repository=RegionRepository(db_session=db_session)
             )
-            await region_service.preload_region_data_if_empty()
+            await region_service.preload_region_data()
     except RegionDataLoadError as error:
         logger.critical(
             f'An error occurred while loading region data: {error}.'
             'The application will be stopped.'
         )
         raise
+    logger.info('>>> Application STARTED successfully <<<')
     yield
-    logger.info(">>> Lifespan FINISHED <<<")
+    logger.info('>>> Application STOPPING <<<')
 
 app = FastAPI(lifespan=lifespan)
 
-# app.include_router(file_router)
-# https://fastapi.tiangolo.com/advanced/settings/#pydantic-settings
+app.include_router(v1_router, prefix='/api/v1')
