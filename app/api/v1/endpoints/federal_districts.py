@@ -1,8 +1,7 @@
 from fastapi import APIRouter
 
-from schemas.region import FederalDistrictSchema
 from dependencies.services import RegionServiceDep
-
+from schemas.region import FederalDistrictSchema
 
 router = APIRouter()
 

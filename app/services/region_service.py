@@ -1,14 +1,14 @@
+from core.config_logger import logger
+from db.models.regions import Region
 from exceptions.repository_exceptions import RegionRepositoryError
 from exceptions.service_exceptions import (
     RegionDataLoadError,
     RegionNotFoundError,
     RegionServiceError,
 )
+from repositories.region_repository import RegionRepository
 from schemas.region import RegionSchema
 from utils.management_save_data_regions import read_csv_file_with_data_regions
-from repositories.region_repository import RegionRepository
-from core.config_logger import logger
-from db.models.regions import Region
 
 
 class RegionService:

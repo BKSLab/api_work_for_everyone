@@ -1,16 +1,14 @@
-from fastapi.concurrency import asynccontextmanager
-
 from fastapi import FastAPI
+from fastapi.concurrency import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.v1 import router as v1_router
-
-from exceptions.service_exceptions import RegionDataLoadError
-from dependencies.services import check_db_connection
-from services.region_service import RegionService
-from repositories.region_repository import RegionRepository
-from db.session import async_session_factory
 from core.config_logger import logger
+from db.session import async_session_factory
+from dependencies.services import check_db_connection
+from exceptions.service_exceptions import RegionDataLoadError
+from repositories.region_repository import RegionRepository
+from services.region_service import RegionService
 
 
 @asynccontextmanager

@@ -1,10 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
+from core.config_logger import logger
+from dependencies.services import RegionServiceDep
 from exceptions.service_exceptions import RegionNotFoundError
 from schemas.region import RegionSchema
-from dependencies.services import RegionServiceDep
-from core.config_logger import logger
-
 
 router = APIRouter()
 

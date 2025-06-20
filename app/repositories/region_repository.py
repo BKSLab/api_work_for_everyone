@@ -1,9 +1,9 @@
-from sqlalchemy import insert, Result, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import Result, insert, select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from exceptions.repository_exceptions import RegionRepositoryError
 from db.models.regions import Region
+from exceptions.repository_exceptions import RegionRepositoryError
 
 
 class RegionRepository:

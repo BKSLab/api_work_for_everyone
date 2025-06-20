@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from .endpoints import regions, federal_districts
+
+from .endpoints import federal_districts, regions
 
 router = APIRouter()
 

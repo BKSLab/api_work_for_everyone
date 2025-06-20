@@ -1,0 +1,5 @@
+[tool.ruff]
+src = ["app"]
+
+[tool.ruff.lint]
+select = ["I"]

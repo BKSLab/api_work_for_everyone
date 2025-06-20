@@ -1,12 +1,12 @@
-from fastapi import Depends
 from typing import Annotated
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config_logger import logger
 from dependencies.repositories import RegionRepositoryDep
 from services.region_service import RegionService
-from core.config_logger import logger
 
 
 async def get_region_service(region_repository: RegionRepositoryDep) -> RegionService:

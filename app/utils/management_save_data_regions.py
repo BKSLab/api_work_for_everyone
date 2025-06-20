@@ -1,5 +1,5 @@
-import os
 import csv
+import os
 
 
 def read_csv_file_with_data_regions() -> dict | None:
