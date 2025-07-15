@@ -5,16 +5,44 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config_logger import logger
-from dependencies.repositories import RegionRepositoryDep
+from dependencies.clients import HHClientDep, TVClientDep
+from dependencies.repositories import RegionRepositoryDep, VacanciesRepositoryDep
 from services.region_service import RegionService
+from services.vacancies_service import VacanciesService
 
 
-async def get_region_service(region_repository: RegionRepositoryDep) -> RegionService:
+async def get_region_service(
+    region_repository: RegionRepositoryDep
+) -> RegionService:
     """Генератор для создания сессии базы данных."""
-    return RegionService(region_repository)
+    return RegionService(
+        region_repository=region_repository
+    )
 
 
-RegionServiceDep = Annotated[RegionService, Depends(get_region_service)]
+RegionServiceDep = Annotated[
+    RegionService, Depends(get_region_service)
+]
+
+
+async def get_vacancies_service(
+    region_service: RegionServiceDep,
+    vacancies_repository: VacanciesRepositoryDep,
+    hh_client_api: HHClientDep,
+    tv_client_api: TVClientDep,
+) -> VacanciesService:
+    """Фабрика для создания экземпляра сервиса работы с вакансиями."""
+    return VacanciesService(
+        region_service=region_service,
+        vacancies_repository=vacancies_repository,
+        hh_client_api=hh_client_api,
+        tv_client_api=tv_client_api,
+    )
+
+
+VacanciesServiceDep = Annotated[
+    VacanciesService, Depends(get_vacancies_service)
+]
 
 
 async def check_db_connection(db_session: AsyncSession) -> bool:

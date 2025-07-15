@@ -12,19 +12,17 @@ class RegionRepository:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
 
-    async def get_region_all_data(self) -> list[Region]:
+    async def get_regions_all_data(self) -> list[Region]:
         """Возвращает полный список регионов."""
         try:
             data = select(Region)
             result: Result = await self.db_session.execute(statement=data)
             regions: list[Region] = result.scalars().all()
             return regions
-        except SQLAlchemyError as error:
-            raise RegionRepositoryError from error
-        except Exception as error:
-            raise RegionRepositoryError from error
+        except (SQLAlchemyError, Exception) as error:
+            raise RegionRepositoryError(cause=error) from error
 
-    async def get_region_all_in_fed_dist(self, fd_code) -> list[Region]:
+    async def get_regions_all_in_fed_dist(self, fd_code) -> list[Region]:
         """Возвращает список регионов в федеральном округе."""
         try:
             data = select(Region).where(
@@ -33,20 +31,27 @@ class RegionRepository:
             result: Result = await self.db_session.execute(statement=data)
             regions: list[Region] = result.scalars().all()
             return regions
-        except SQLAlchemyError as error:
-            raise RegionRepositoryError from error
-        except Exception as error:
-            raise RegionRepositoryError from error
+        except (SQLAlchemyError, Exception) as error:
+            raise RegionRepositoryError(cause=error) from error
 
-    async def add_region_data(self, region_data: list[dict]) -> None:
+    async def get_region_data(self, region_code_tv) -> Region:
+        """Возвращает данные одного региона."""
+        try:
+            data = select(Region).where(
+                Region.region_code_tv == region_code_tv
+            )
+            result: Result = await self.db_session.execute(statement=data)
+            regions: Region = result.scalars().one_or_none()
+            return regions
+        except (SQLAlchemyError, Exception) as error:
+            raise RegionRepositoryError(cause=error) from error
+
+    async def add_regions_data(self, region_data: list[dict]) -> None:
         """Сохраняет данные о регионах при старте приложения."""
         try:
             data = insert(table=Region).values(region_data)
             await self.db_session.execute(statement=data)
             await self.db_session.commit()
-        except SQLAlchemyError as error:
+        except (SQLAlchemyError, Exception) as error:
             await self.db_session.rollback()
-            raise RegionRepositoryError from error
-        except Exception as error:
-            await self.db_session.rollback()
-            raise RegionRepositoryError from error
+            raise RegionRepositoryError(cause=error) from error

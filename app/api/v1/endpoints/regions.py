@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, Query, status
+from typing import Annotated
 
-from core.config_logger import logger
+from fastapi import APIRouter, HTTPException, Query
+
+from app.exceptions.repository_exceptions import RegionRepositoryError
 from dependencies.services import RegionServiceDep
-from exceptions.service_exceptions import RegionNotFoundError
+from exceptions.service_exceptions import RegionsNotFoundError
 from schemas.region import RegionSchema
 
 router = APIRouter()
@@ -18,11 +20,10 @@ async def list_regions(region_service: RegionServiceDep) -> list[RegionSchema]:
     """Возвращает полный список всех регионов."""
     try:
         return await region_service.get_region_list()
-    except RegionNotFoundError as error:
-        logger.error(f'Region not found: {error}')
+    except RegionRepositoryError as error:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail='Regions not found'
+            status_code=error.status_code,
+            detail=error.detail()
         )
 
 
@@ -45,23 +46,19 @@ async def list_regions(region_service: RegionServiceDep) -> list[RegionSchema]:
 )
 async def list_regions_by_federal_district(
     region_service: RegionServiceDep,
-    federal_district_code: str = Query(
-        ..., description='Код федерального округа'
-    ),
+    federal_district_code: Annotated[
+        str, Query(
+            description='Код федерального округа',
+        )
+    ],
 ) -> list[RegionSchema]:
     """Возвращает список регионов в заданном федеральном округе."""
     try:
         return await region_service.get_region_in_federal_district(
             federal_district_code=federal_district_code
         )
-    except RegionNotFoundError as error:
-        logger.error(
-            f'No regions found in the submitted federal district: {error}'
-        )
+    except (RegionsNotFoundError, RegionRepositoryError) as error:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                'No regions found in the submitted federal district'
-                f' with code: {federal_district_code}'
-            )
+            status_code=error.status_code,
+            detail=error.detail(),
         )

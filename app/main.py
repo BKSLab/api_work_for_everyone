@@ -6,7 +6,7 @@ from api.v1 import router as v1_router
 from core.config_logger import logger
 from db.session import async_session_factory
 from dependencies.services import check_db_connection
-from exceptions.service_exceptions import RegionDataLoadError
+from exceptions.service_exceptions import RegionStartupError
 from repositories.region_repository import RegionRepository
 from services.region_service import RegionService
 
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
                 region_repository=RegionRepository(db_session=db_session)
             )
             await region_service.preload_region_data()
-    except RegionDataLoadError as error:
+    except RegionStartupError as error:
         logger.critical(
             f'An error occurred while loading region data: {error}.'
             'The application will be stopped.'

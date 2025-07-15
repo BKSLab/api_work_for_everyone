@@ -1,6 +1,9 @@
 import csv
 import os
 
+from core.config_logger import logger
+from exceptions.service_exceptions import RegionDataLoadError
+
 
 def read_csv_file_with_data_regions() -> dict | None:
     """Чтение данных о регионах из CSV и возврат результата в виде словаря."""
@@ -29,11 +32,9 @@ def read_csv_file_with_data_regions() -> dict | None:
             ]
             return rows
     except csv.Error as error:
-        print(f'error (csv.Error): {error}')
-        return None
+        logger.error(f'error (csv.Error): {error}')
     except FileNotFoundError as error:
-        print(f'error (FileNotFoundError): {error}')
-        return None
+        logger.error(f'error (FileNotFoundError): {error}')
     except Exception as error:
-        print(f'error (Exception): {error}')
-        return None
+        logger.error(f'error (Exception): {error}')
+        raise RegionDataLoadError from error

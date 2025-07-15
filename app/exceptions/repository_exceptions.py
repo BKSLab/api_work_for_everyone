@@ -1,3 +1,16 @@
+from fastapi import status
+
+
 class RegionRepositoryError(Exception):
     """Исключение для класса репозиттория для работы с регионами."""
-    pass
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    def __init__(self, *, cause: Exception = None):
+        self.__cause__ = cause
+        super().__init__()
+
+    def detail(self) -> str:
+        return (
+            'An error occurred while retrieving region. Please contact '
+            'the developer or try again after some time.'
+        )

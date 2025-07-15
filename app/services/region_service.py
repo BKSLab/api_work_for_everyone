@@ -2,9 +2,11 @@ from core.config_logger import logger
 from db.models.regions import Region
 from exceptions.repository_exceptions import RegionRepositoryError
 from exceptions.service_exceptions import (
+    EmptyRegionsDatabaseError,
     RegionDataLoadError,
     RegionNotFoundError,
-    RegionServiceError,
+    RegionsNotFoundError,
+    RegionStartupError,
 )
 from repositories.region_repository import RegionRepository
 from schemas.region import RegionSchema
@@ -33,44 +35,64 @@ class RegionService:
     async def is_region_data_present(self) -> None:
         """Проверка наличия и корректности данных о регионах в БД."""
         try:
-            region_data = await self.region_repository.get_region_all_data()
+            region_data = await self.region_repository.get_regions_all_data()
             check_result = await self.check_region_data(
                 region_data=region_data
             )
             if not check_result:
-                raise RegionNotFoundError(
-                    'data on regions is missing or their number does '
-                    'not correspond to the expected'
-                )
+                logger.warning('No valid region data found.')
+                raise EmptyRegionsDatabaseError()
         except RegionRepositoryError as error:
-            raise RegionServiceError from error
+            logger.error('Ошибка при обращении к БД:', exc_info=error)
+            raise
 
     async def get_region_list(self) -> list[RegionSchema]:
         """Получение списка регионов."""
         try:
-            region_data = await self.region_repository.get_region_all_data()
+            region_data = await self.region_repository.get_regions_all_data()
             return [
                 RegionSchema.model_validate(region) for region in region_data
             ]
         except RegionRepositoryError as error:
-            raise RegionNotFoundError from error
+            logger.error('Ошибка при обращении к БД:', exc_info=error)
+            raise
 
     async def get_region_in_federal_district(
         self, federal_district_code: str
     ) -> list[RegionSchema]:
         """Получение списка регионов с разбивкой по федеральным округам."""
         try:
-            region_data = await self.region_repository.get_region_all_in_fed_dist(
+            region_data = await self.region_repository.get_regions_all_in_fed_dist(
                 fd_code=federal_district_code
             )
             if not region_data:
-                raise RegionNotFoundError(
-                    'No regions found in the federal district '
-                    f'with code: {federal_district_code}'
+                logger.error(
+                    f'No regions found with fede_code: {federal_district_code}'
                 )
-            return [RegionSchema.model_validate(region) for region in region_data]
+                raise RegionsNotFoundError(federal_district_code)
+            return [
+                RegionSchema.model_validate(region) for region in region_data
+            ]
         except RegionRepositoryError as error:
-            raise RegionNotFoundError from error
+            logger.error('Ошибка при обращении к БД:', exc_info=error)
+            raise
+
+    async def get_region_by_code(self, region_code_tv: str) -> dict:
+        """
+        Возвращает данные региона по государственному
+        коду регионов (region_code_tv).
+        """
+        try:
+            region_data = await self.region_repository.get_region_data(
+                region_code_tv=region_code_tv
+            )
+            if not region_data:
+                logger.error(f'No regions found with code: {region_code_tv}')
+                raise RegionNotFoundError(region_code_tv)
+            return RegionSchema.model_validate(region_data).model_dump()
+        except RegionRepositoryError as error:
+            logger.error('Ошибка при обращении к БД:', exc_info=error)
+            raise
 
     async def get_federal_districts_list(self) -> list[dict]:
         """Получение списка федеральных округов."""
@@ -118,31 +140,23 @@ class RegionService:
             await self.is_region_data_present()
             logger.info('Region data already present in the database.')
             return
-        except RegionNotFoundError as error:
-            logger.info(
-                f'No valid region data found. Message: {error}\n'
-                'Starting preload...'
-            )
-        
-            data_regions = read_csv_file_with_data_regions()
-            if not data_regions:
-                raise RegionDataLoadError(
-                    'No region data found in CSV file'
-                )
-            await self.region_repository.add_region_data(
-                region_data=data_regions
-            )
+        except EmptyRegionsDatabaseError:
             try:
+                data_regions = read_csv_file_with_data_regions()
+                await self.region_repository.add_regions_data(
+                    region_data=data_regions
+                )
                 await self.is_region_data_present()
                 logger.info(
                     'Region data preloaded and validated successfully.'
                 )
-
-            except RegionNotFoundError as error:
-                raise RegionDataLoadError(
-                    'Preloaded region data is invalid.'
-                ) from error
-        except (
-            RegionServiceError, RegionRepositoryError, Exception
-        ) as error:
-            raise RegionDataLoadError(f'Unexpected error: {error}') from error
+                return
+            except (
+                RegionDataLoadError,
+                RegionRepositoryError,
+                EmptyRegionsDatabaseError
+            ) as error:
+                logger.error(f'Ошибка при загрузке данных о регионах: {error}')
+                raise RegionStartupError() from error
+        except RegionRepositoryError as error:
+            raise RegionStartupError() from error
