@@ -57,7 +57,7 @@ async def search_and_download_vacancies(
             detail=error.detail(),
         )
     # вызываем метод получения информации о вакансиях
-    result = await vacancies_service.get_vacancies_count(
+    result = await vacancies_service.get_vacancies_from_tv(
         location=validated_data.get('location'),
         region_data=validated_data.get('region_data')
     )

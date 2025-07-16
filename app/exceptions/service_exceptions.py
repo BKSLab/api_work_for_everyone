@@ -66,3 +66,41 @@ class InvalidLocationError(Exception):
 
     def detail(self) -> str:
         return f'Invalid location: {self.location}'
+
+
+class TVAPIRequestError(Exception):
+    """Ошибка при обращении к API 'Работа для всех'."""
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    def __init__(self, request_params: dict):
+        self.request_params = request_params
+
+    def detail(self) -> str:
+        return (
+            'Failed to get a response from "Work for Everyone" API. '
+            f'Request parameters: {self.request_params}'
+        )
+
+
+class VacanciesNotFoundError(Exception):
+    """Вакансийц по заданному коду региона не найдено. API 'Работа для всех'."""
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, region_code: str):
+        self.region_code = region_code
+
+    def detail(self) -> str:
+        return (
+            'No vacancies found in the specified region using the "Work for Everyone" API. '
+            f'Region code: {self.region_code}'
+        )
+
+class VacancyParseError(Exception):
+    """Ошибка при разборе вакансий от Trudvsem"""
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    def detail(self) -> str:
+        return (
+            'An error occurred while processing vacancy data received from the "Work for Everyone" API. '
+            'Please try again later or contact support.'
+        )

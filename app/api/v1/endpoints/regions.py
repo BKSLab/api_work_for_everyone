@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.exceptions.repository_exceptions import RegionRepositoryError
+from exceptions.repository_exceptions import RegionRepositoryError
 from dependencies.services import RegionServiceDep
 from exceptions.service_exceptions import RegionsNotFoundError
 from schemas.region import RegionSchema
