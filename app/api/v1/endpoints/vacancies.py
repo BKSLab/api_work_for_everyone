@@ -1,6 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
 
-from schemas.vacancies import VacanciesInfoSchema, VacanciesSearchRequest
+from fastapi import APIRouter, HTTPException, Query
+
+from schemas.vacancies import (
+    VacanciesInfoSchema,
+    VacanciesListSchema,
+    VacanciesSearchRequest
+)
 from dependencies.services import VacanciesServiceDep
 from exceptions.repository_exceptions import (
     RegionRepositoryError,
@@ -12,6 +18,7 @@ from exceptions.service_exceptions import (
     RegionNotFoundError,
     TVAPIRequestError,
     VacanciesHHNotFoundError,
+    VacanciesNotFoundError,
     VacanciesTVNotFoundError,
     VacancyParseError,
 )
@@ -63,4 +70,47 @@ async def search_and_download_vacancies(
         raise HTTPException(
             status_code=error.status_code,
             detail=error.detail(),
+        )
+
+
+@router.get(
+    path='/list',
+    summary='Получить список вакансий по локации с пагинацией',
+    response_model=VacanciesListSchema,
+)
+async def get_vacancies(
+    vacancies_service: VacanciesServiceDep,
+    location: Annotated[
+        str, Query(
+            description='Наименование населенного пункта'
+        )
+    ],
+    page: Annotated[
+        int, Query(
+            ge=1,
+            description='Номер страницы.'
+        )
+    ] = 1,
+    page_size: Annotated[
+        int, Query(
+            ge=1,
+            le=100,
+            description='Количество вакансий на странице.'
+        )
+    ] = 10,
+):
+    """"Возвращает список вакансий по локации с пагинацией."""
+    try:
+        return await vacancies_service.get_vacancies_by_location(
+            location=location,
+            page=page,
+            page_size=page_size
+        )
+    except (
+        VacanciesRepositoryError,
+        VacanciesNotFoundError
+    ) as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail=error.detail()
         )

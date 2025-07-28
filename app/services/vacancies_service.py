@@ -1,5 +1,6 @@
 import re
 
+from schemas.vacancies import VacanciesListSchema, VacancyOutSchema
 from clients.hh_api_client import HHClient
 from clients.tv_api_client import TVClient
 from core.config_logger import logger
@@ -13,6 +14,7 @@ from exceptions.service_exceptions import (
     RegionNotFoundError,
     TVAPIRequestError,
     VacanciesHHNotFoundError,
+    VacanciesNotFoundError,
     VacanciesTVNotFoundError,
     VacancyParseError
 )
@@ -405,4 +407,36 @@ class VacanciesService:
             VacancyParseError,
             VacanciesRepositoryError
         ):
+            raise
+    
+    async def get_vacancies_by_location(
+        self, location: str, page: int, page_size: int
+    ):
+        """
+        Возвращает список вакансий в локации по заданным условиям.
+        """
+        logger.info(
+            f'Получение списка вакансий по локации: {location}, '
+            f'страница: {page}, размер страницы: {page_size}'
+        )
+        try:
+            total = await self.vacancies_repository.get_count_vacancies(
+                location=location
+            )
+            if total == 0:
+                logger.info(f'Вакансии не найдены для локации: {location}')
+                raise VacanciesNotFoundError(location=location)
+            vacancies = await self.vacancies_repository.get_vacancies(
+                location=location, page=page, page_size=page_size
+            )
+            items = [
+                VacancyOutSchema.model_validate(vacancy) for vacancy in vacancies
+            ]
+            return VacanciesListSchema(
+                total=total,
+                page=page,
+                page_size=page_size,
+                items=items
+            )
+        except VacanciesRepositoryError:
             raise

@@ -126,6 +126,20 @@ class VacanciesHHNotFoundError(Exception):
         )
 
 
+class VacanciesNotFoundError(Exception):
+    """Вакансий по заданной локации не найдено."""
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, location: str):
+        self.location = location
+
+    def detail(self) -> str:
+        return (
+            f'No vacancies found for location "{self.location}". '
+            'Please check the spelling and try again.'
+        )
+
+
 class VacancyParseError(Exception):
     """Ошибка при разборе вакансий от Trudvsem"""
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR

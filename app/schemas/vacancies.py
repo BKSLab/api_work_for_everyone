@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class VacanciesSearchRequest(BaseModel):
@@ -20,3 +20,29 @@ class VacanciesInfoSchema(BaseModel):
     vacancies_count_hh: int
     location: str
     region_name: str
+
+
+class VacancyOutSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    vacancy_id: str
+    location: str
+    name: str
+    description: str
+    salary: str
+    vacancy_url: str
+    vacancy_source: str
+    employer_name: str
+    employer_location: str
+    employer_phone: str
+    employer_code: str
+    experience_required: str
+    category: str
+    employment_type: str
+    schedule: str
+
+
+class VacanciesListSchema(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[VacancyOutSchema]
