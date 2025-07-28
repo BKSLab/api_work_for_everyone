@@ -57,7 +57,10 @@ class TVClient:
         return ceil(total_vacansies / self.VACANCIES_PER_ONE_PAGE)
 
     async def get_many_vacansies_in_region(
-        self, region_code_tv: str, count_pages: int, first_page_vacansies: list[dict]
+        self,
+        region_code_tv: str,
+        count_pages: int,
+        first_page_vacansies: list[dict]
     ) -> list[dict]:
         """Получение данных вакансий в регионе по нескольким страницам."""
         try:

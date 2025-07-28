@@ -20,5 +20,5 @@ RegionRepositoryDep = Annotated[
 ]
 
 VacanciesRepositoryDep = Annotated[
-    VacanciesRepository, Depends(get_region_repository)
+    VacanciesRepository, Depends(get_vacancies_repository)
 ]

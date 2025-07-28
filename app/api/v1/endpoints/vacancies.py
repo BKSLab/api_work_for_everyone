@@ -1,19 +1,26 @@
-from typing import Annotated
+from fastapi import APIRouter, HTTPException
 
-from fastapi import APIRouter, HTTPException, Query, status
-
-from core.config_logger import logger
+from schemas.vacancies import VacanciesInfoSchema, VacanciesSearchRequest
 from dependencies.services import VacanciesServiceDep
-from exceptions.repository_exceptions import RegionRepositoryError
+from exceptions.repository_exceptions import (
+    RegionRepositoryError,
+    VacanciesRepositoryError
+)
 from exceptions.service_exceptions import (
+    HHAPIRequestError,
     InvalidLocationError,
     RegionNotFoundError,
+    TVAPIRequestError,
+    VacanciesHHNotFoundError,
+    VacanciesTVNotFoundError,
+    VacancyParseError,
 )
+
 
 router = APIRouter()
 
 
-@router.get(
+@router.post(
     path='/search',
     summary=(
         'Получить количество найденных вакансий в '
@@ -23,51 +30,37 @@ router = APIRouter()
         'Возвращает количество найденных вакансий в '
         'заданном населенном пункте.'
     ),
-    # response_model=list[RegionSchema]
+    response_model=VacanciesInfoSchema
 )
 async def search_and_download_vacancies(
-    region_code: Annotated[
-        str, Query(
-            description='Код региона',
-        )
-    ],
-    location: Annotated[
-        str, Query(
-            description='Наименование населенного пункта',
-        )
-    ],
+    data: VacanciesSearchRequest,
     vacancies_service: VacanciesServiceDep
-):
+) -> VacanciesInfoSchema:
     """
-    Возвращает количество найденных вакансий в заданном населенном пункте.
+    Сохраняет и возвращает количество найденных вакансий в заданном населенном пункте.
     """
-    logger.info(f'location: {location}')
-    logger.info(f'region_name: {region_code}')    
     try:
         validated_data = await vacancies_service.validation_and_get_region_data(
-            location=location, region_code=region_code
+            location=data.location,
+            region_code=data.region_code
         )
+        vacancies_info = await vacancies_service.get_vacancies_info(
+            location=validated_data.get('location'),
+            region_data=validated_data.get('region_data')
+        )
+        return vacancies_info
     except (
         InvalidLocationError,
         RegionNotFoundError,
-        RegionRepositoryError
+        RegionRepositoryError,
+        TVAPIRequestError,
+        HHAPIRequestError,
+        VacanciesHHNotFoundError,
+        VacanciesTVNotFoundError,
+        VacancyParseError,
+        VacanciesRepositoryError
     ) as error:
         raise HTTPException(
             status_code=error.status_code,
             detail=error.detail(),
         )
-    # вызываем метод получения информации о вакансиях
-    result = await vacancies_service.get_vacancies_from_tv(
-        location=validated_data.get('location'),
-        region_data=validated_data.get('region_data')
-    )
-    # except InvalidLocationError as e:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    #         detail=str(e)
-    #     )
-    # except InvalidRegionCodeError as e:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_404_NOT_FOUND,
-    #         detail=str(e)
-    #     )

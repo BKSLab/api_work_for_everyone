@@ -10,7 +10,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 class SettingsBase(BaseSettings):
     """Базовый класс для настроек приложения."""
-    model_config = SettingsConfigDict(env_file=os.path.join(BASE_DIR, '.env'))
+    model_config = SettingsConfigDict(
+        env_file=os.path.join(BASE_DIR, '.env'),
+        extra='ignore'
+    )
+
+
+class AppSettings(SettingsBase):
+    """Класс настроек для приложения"""
+    access_token_hh: SecretStr
 
 
 class DBSettings(SettingsBase):
@@ -33,6 +41,7 @@ class DBSettings(SettingsBase):
 class Settings(BaseSettings):
     """Общий класс работы с чувствительными данными."""
     db: DBSettings = Field(default_factory=DBSettings)
+    app: AppSettings = Field(default_factory=AppSettings)
 
 
 @lru_cache

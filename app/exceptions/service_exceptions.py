@@ -82,18 +82,49 @@ class TVAPIRequestError(Exception):
         )
 
 
-class VacanciesNotFoundError(Exception):
-    """Вакансийц по заданному коду региона не найдено. API 'Работа для всех'."""
-    status_code = status.HTTP_404_NOT_FOUND
+class HHAPIRequestError(Exception):
+    """Ошибка при обращении к API 'hh.ru'."""
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
-    def __init__(self, region_code: str):
-        self.region_code = region_code
+    def __init__(self, request_params: dict):
+        self.request_params = request_params
 
     def detail(self) -> str:
         return (
-            'No vacancies found in the specified region using the "Work for Everyone" API. '
-            f'Region code: {self.region_code}'
+            'Failed to get a response from "hh.ru" API. '
+            f'Request parameters: {self.request_params}'
         )
+
+
+class VacanciesTVNotFoundError(Exception):
+    """Вакансийц по заданному коду региона не найдено. API 'Работа для всех'."""
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, region_code: str, location: str):
+        self.region_code = region_code
+        self.location = location
+
+    def detail(self) -> str:
+        return (
+            'No vacancies found in the specified region using the trudvsem API. '
+            f'Region code: {self.region_code}, location: {self.location}'
+        )
+
+
+class VacanciesHHNotFoundError(Exception):
+    """Вакансийц по заданному коду региона не найдено. API 'Работа для всех'."""
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, region_code: str, location: str):
+        self.region_code = region_code
+        self.location = location
+
+    def detail(self) -> str:
+        return (
+            'No vacancies found in the specified region using the hh.ru API. '
+            f'Region code: {self.region_code}, location: {self.location}'
+        )
+
 
 class VacancyParseError(Exception):
     """Ошибка при разборе вакансий от Trudvsem"""
