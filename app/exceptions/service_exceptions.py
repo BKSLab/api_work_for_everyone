@@ -111,6 +111,21 @@ class VacanciesTVNotFoundError(Exception):
         )
 
 
+class VacancyTVNotFoundError(Exception):
+    """Не удалось получить детальную информацию по вакансии. API 'Работа для всех'."""
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, vacancy_id: str, employer_code: str):
+        self.vacancy_id = vacancy_id
+        self.employer_code = employer_code
+
+    def detail(self) -> str:
+        return (
+            'No vacancy found using the trudvsem API. '
+            f'vacancy_id: {self.vacancy_id}, employer_code: {self.employer_code}'
+        )
+
+
 class VacanciesHHNotFoundError(Exception):
     """Вакансийц по заданному коду региона не найдено. API 'Работа для всех'."""
     status_code = status.HTTP_404_NOT_FOUND
@@ -126,6 +141,20 @@ class VacanciesHHNotFoundError(Exception):
         )
 
 
+class VacancyHHNotFoundError(Exception):
+    """Вакансия на сайте hh.ru не найдена по заданному id."""
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, vacancy_id: str):
+        self.vacancy_id = vacancy_id
+
+    def detail(self) -> str:
+        return (
+            'No vacancy found using the hh.ru API. '
+            f'vacancy_id: {self.vacancy_id}'
+        )
+
+
 class VacanciesNotFoundError(Exception):
     """Вакансий по заданной локации не найдено."""
     status_code = status.HTTP_404_NOT_FOUND
@@ -136,6 +165,20 @@ class VacanciesNotFoundError(Exception):
     def detail(self) -> str:
         return (
             f'No vacancies found for location "{self.location}". '
+            'Please check the spelling and try again.'
+        )
+
+
+class VacancyNotFoundError(Exception):
+    """Вакансия не найдена в БД."""
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, vacancy_id: str):
+        self.vacancy_id = vacancy_id
+
+    def detail(self) -> str:
+        return (
+            f'No vacancy found for vacancy_id "{self.vacancy_id}". '
             'Please check the spelling and try again.'
         )
 

@@ -1,4 +1,6 @@
-from sqlalchemy import Result, func, insert, select, delete
+from pprint import pprint
+
+from sqlalchemy import Result, delete, func, insert, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,10 +49,24 @@ class VacanciesRepository:
                 .limit(page_size)
             )
             result: Result = await self.db_session.execute(statement=stmt)
-            regions: list[Vacancies] = result.scalars().all()
-            return regions
+            vacancies: list[Vacancies] = result.scalars().all()
+            return vacancies
         except (SQLAlchemyError, Exception) as error:
             logger.error(f'Ошибка при получении данных о вакансиях: {error}')
+            raise VacanciesRepositoryError(cause=error) from error
+
+    async def get_vacancy_by_id(self, vacancy_id: str) -> Vacancies | None:
+        """Возвращает вакансию по vacancy_id."""
+        try:
+            stmt = (
+                select(Vacancies)
+                .where(Vacancies.vacancy_id == vacancy_id)
+            )
+            result: Result = await self.db_session.execute(statement=stmt)
+            vacancy: Vacancies | None = result.scalars().one_or_none()
+            return vacancy
+        except (SQLAlchemyError, Exception) as error:
+            logger.error(f'Ошибка при получении данных о вакансии: {error}')
             raise VacanciesRepositoryError(cause=error) from error
 
     async def get_count_vacancies(self, location: str) -> int:

@@ -1,10 +1,11 @@
 import asyncio
 from math import ceil
+from pprint import pprint
 
 import httpx
 
-from exceptions.service_exceptions import TVAPIRequestError
 from core.config_logger import logger
+from exceptions.service_exceptions import TVAPIRequestError
 
 
 class TVClient:
@@ -23,12 +24,13 @@ class TVClient:
     def __init__(self, httpx_client: httpx.AsyncClient):
         self.httpx_client = httpx_client
 
-    async def request_to_api_tv(self, url: str, params: dict) -> dict:
+    async def request_to_api_tv(self, url: str, params: dict | None = None) -> dict:
         """Запрос к API портала 'Работа России'."""
         try:
+
             response = await self.httpx_client.get(
                 url=url,
-                params=params,
+                params=params or {},
             )
             response.raise_for_status()
             response_data = response.json()
@@ -121,5 +123,21 @@ class TVClient:
                     first_page_vacansies=first_page_data.get('results', {}).get('vacancies', [])
                 )
             return first_page_data.get('results', {}).get('vacancies', [])
+        except TVAPIRequestError:
+            raise
+
+    async def get_one_vacancy(self, vacancy_id: str, employer_code: str) -> dict:
+        """Получение данных вакансий в регионе."""
+        try:
+            vacancy = await self.request_to_api_tv(
+                url='/'.join(
+                    [
+                        self.ONE_VACANCY_ENDPOINT,
+                        employer_code,
+                        vacancy_id,
+                    ]
+                ),
+            )
+            return vacancy.get('results', {}).get('vacancies', [None])[0].get('vacancy', {})
         except TVAPIRequestError:
             raise

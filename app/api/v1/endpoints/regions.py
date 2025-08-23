@@ -2,8 +2,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 
-from exceptions.repository_exceptions import RegionRepositoryError
 from dependencies.services import RegionServiceDep
+from exceptions.repository_exceptions import RegionRepositoryError
 from exceptions.service_exceptions import RegionsNotFoundError
 from schemas.region import RegionSchema
 
@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get(
-    path='/get-all',
+    path='/list',
     summary='Получить список всех регионов.',
     description='Возвращает полный список всех регионов.',
     response_model=list[RegionSchema]
