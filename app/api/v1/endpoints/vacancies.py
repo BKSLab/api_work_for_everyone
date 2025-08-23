@@ -1,16 +1,12 @@
+from pprint import pprint
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 
-from schemas.vacancies import (
-    VacanciesInfoSchema,
-    VacanciesListSchema,
-    VacanciesSearchRequest
-)
 from dependencies.services import VacanciesServiceDep
 from exceptions.repository_exceptions import (
     RegionRepositoryError,
-    VacanciesRepositoryError
+    VacanciesRepositoryError,
 )
 from exceptions.service_exceptions import (
     HHAPIRequestError,
@@ -20,9 +16,17 @@ from exceptions.service_exceptions import (
     VacanciesHHNotFoundError,
     VacanciesNotFoundError,
     VacanciesTVNotFoundError,
+    VacancyHHNotFoundError,
+    VacancyNotFoundError,
     VacancyParseError,
+    VacancyTVNotFoundError,
 )
-
+from schemas.vacancies import (
+    VacanciesInfoSchema,
+    VacanciesListSchema,
+    VacanciesSearchRequest,
+    VacancyDetailsOutSchema,
+)
 
 router = APIRouter()
 
@@ -109,6 +113,40 @@ async def get_vacancies(
     except (
         VacanciesRepositoryError,
         VacanciesNotFoundError
+    ) as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail=error.detail()
+        )
+
+
+@router.get(
+    path='/{vacancy_id}',
+    summary='Получить информацию о вакансии по ID',
+    response_model=VacancyDetailsOutSchema,
+)
+async def get_vacancy_by_id(
+    vacancy_id: Annotated[
+        str, Path(
+            description='ID вакансии'
+        )
+    ],
+    vacancies_service: VacanciesServiceDep,
+):
+    """
+    Возвращает подробную информацию об одной вакансии по её ID.
+    """
+    try:
+        return await vacancies_service.get_vacancy_details(
+            vacancy_id=vacancy_id
+        )
+    except (
+        TVAPIRequestError,
+        HHAPIRequestError,
+        VacancyParseError,
+        VacancyHHNotFoundError,
+        VacancyTVNotFoundError,
+        VacancyNotFoundError,
     ) as error:
         raise HTTPException(
             status_code=error.status_code,

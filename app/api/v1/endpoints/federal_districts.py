@@ -7,7 +7,7 @@ router = APIRouter()
 
 
 @router.get(
-    path='/get-all',
+    path='/list',
     summary='Получить список всех федеральных округов.',
     description='Возвращает полный список всех федеральных округов.',
     response_model=list[FederalDistrictSchema]

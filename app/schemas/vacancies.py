@@ -46,3 +46,20 @@ class VacanciesListSchema(BaseModel):
     page: int
     page_size: int
     items: list[VacancyOutSchema]
+
+
+class VacancyDetailsOutSchema(BaseModel):
+    vacancy_name: str
+    vacancy_id: str
+    vacancy_url: str
+    social_protected: str
+    vacancy_source: str
+    description: str
+    employer_location: str
+    salary: str
+    employer_name: str
+    company_code: str
+    employer_phone: str
+    employer_email: str
+    contact_person: str
+    employment: str

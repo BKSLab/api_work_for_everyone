@@ -56,7 +56,7 @@ class Vacancies(Base):
         doc='Наименование работодателя.'
     )
     employer_location: Mapped[Optional[str]] = mapped_column(
-        String(length=300),
+        Text,
         nullable=False,
         doc='Адрес места нахождения работодателя.'
     )

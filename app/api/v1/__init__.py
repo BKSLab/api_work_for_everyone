@@ -14,11 +14,13 @@ router.include_router(
     tags=['Regions']
 )
 
+
 router.include_router(
     federal_districts.router,
     prefix='/federal-districts',
     tags=['Federal districts']
 )
+
 
 router.include_router(
     vacancies.router,
