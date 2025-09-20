@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from .endpoints import (
+    auth,
     federal_districts,
     regions,
     vacancies,
@@ -26,4 +27,11 @@ router.include_router(
     vacancies.router,
     prefix='/vacancies',
     tags=['Vacancies']
+)
+
+
+router.include_router(
+    auth.router,
+    prefix='/auth',
+    tags=['Auth']
 )

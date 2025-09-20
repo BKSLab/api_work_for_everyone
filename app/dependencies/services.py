@@ -4,11 +4,21 @@ from fastapi import Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.users_service import UsersService
 from core.config_logger import logger
 from dependencies.clients import HHClientDep, TVClientDep
-from dependencies.repositories import RegionRepositoryDep, VacanciesRepositoryDep
+from dependencies.repositories import RegionRepositoryDep, UsersRepositoryDep, VacanciesRepositoryDep
 from services.region_service import RegionService
 from services.vacancies_service import VacanciesService
+
+
+async def get_users_service(
+    users_repository: UsersRepositoryDep
+) -> UsersService:
+    """Генератор для создания сессии базы данных."""
+    return UsersService(
+        users_repository=users_repository
+    )
 
 
 async def get_region_service(
@@ -22,6 +32,9 @@ async def get_region_service(
 
 RegionServiceDep = Annotated[
     RegionService, Depends(get_region_service)
+]
+UsersServiceDep = Annotated[
+    UsersService, Depends(get_users_service)
 ]
 
 
