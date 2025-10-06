@@ -4,8 +4,8 @@ from core.config_logger import logger
 from fastapi import HTTPException
 from starlette import status
 
-from app.schemas.users import UserRegisterSchema  # Предполагаем, что схема находится здесь
-from app.utils.security import hash_password
+from schemas.users import UserRegisterSchema
+from utils.security import hash_password
 
 
 class UsersService:
