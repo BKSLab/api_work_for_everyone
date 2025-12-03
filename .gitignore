@@ -4,6 +4,10 @@ __pycache__/
 *$py.class
 .dockerignore
 
+# ключи RSA
+private.pem
+public.pem
+
 # C extensions
 *.so
 
