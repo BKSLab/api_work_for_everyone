@@ -4,11 +4,17 @@ from fastapi import Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.users_service import UsersService
 from core.config_logger import logger
 from dependencies.clients import HHClientDep, TVClientDep
-from dependencies.repositories import RegionRepositoryDep, UsersRepositoryDep, VacanciesRepositoryDep
+from dependencies.repositories import (
+    BlocklistRepositoryDep,
+    RegionRepositoryDep,
+    UsersRepositoryDep,
+    VacanciesRepositoryDep,
+)
+from services.blocklist_service import BlocklistService
 from services.region_service import RegionService
+from services.users_service import UsersService
 from services.vacancies_service import VacanciesService
 
 
@@ -29,12 +35,21 @@ async def get_region_service(
         region_repository=region_repository
     )
 
+async def get_blocklist_service(
+    blocklist_repository: BlocklistRepositoryDep
+) -> BlocklistService:
+    """Зависимость для сервиса черного списка токенов."""
+    return BlocklistService(blocklist_repo=blocklist_repository)
+
 
 RegionServiceDep = Annotated[
     RegionService, Depends(get_region_service)
 ]
 UsersServiceDep = Annotated[
     UsersService, Depends(get_users_service)
+]
+BlocklistServiceDep = Annotated[
+    BlocklistService, Depends(get_blocklist_service)
 ]
 
 

@@ -192,3 +192,4 @@ class VacancyParseError(Exception):
             'An error occurred while processing vacancy data received from the "Work for Everyone" API. '
             'Please try again later or contact support.'
         )
+

@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
-
 from typing import Optional
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String, Boolean, DateTime, ForeignKey
 
 from .base import Base
 
@@ -86,3 +86,37 @@ class EmailVerificationCode(Base):
 
     def __repr__(self) -> str:
         return f'<EmailVerificationCode(user_id={self.user_id}, code={self.code})>'
+
+
+class PasswordResetCode(Base):
+    """
+    Модель для хранения кодов сброса пароля.
+    """
+
+    __tablename__ = 'password_reset_codes'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', ondelete='CASCADE'),
+        nullable=False,
+        doc='ID пользователя.'
+    )
+    code: Mapped[str] = mapped_column(
+        String(length=20), # Assuming a similar length for reset codes
+        nullable=False,
+        doc='Код сброса пароля.'
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        doc='Время истечения действия кода.'
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        doc='Дата и время создания кода.'
+    )
+
+    def __repr__(self) -> str:
+        return f'<PasswordResetCode(user_id={self.user_id}, code={self.code})>'

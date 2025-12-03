@@ -44,3 +44,10 @@ class UsersRepositoryError(Exception):
             'An error occurred while processing users. '
             'Please contact the developer or try again later.'
         )
+
+
+class BlocklistRepositoryError(Exception):
+    """Базовое исключение для ошибок репозитория BlocklistRepository."""
+    def __init__(self, *, cause: Exception = None):
+        self.__cause__ = cause
+        super().__init__()
