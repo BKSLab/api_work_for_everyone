@@ -1,7 +1,8 @@
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint, Text
+from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
+
 from .base_vacancy import BaseVacancy
 
 

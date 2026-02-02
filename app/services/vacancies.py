@@ -1,7 +1,7 @@
+import asyncio
 import logging
 import re
 from pprint import pformat
-import asyncio
 
 from pydantic import ValidationError
 
@@ -27,7 +27,6 @@ from schemas.vacancies import (
 )
 from services.parsing_vacancies import VacanciesParsingService
 from services.regions import RegionService
-
 
 logger = logging.getLogger(__name__)
 

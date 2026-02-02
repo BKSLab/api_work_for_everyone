@@ -7,7 +7,6 @@ from fastapi import status
 from core.settings import get_settings
 from exceptions.api_clients import HHAPIRequestError
 
-
 settings = get_settings()
 logger = logging.getLogger(__name__)
 

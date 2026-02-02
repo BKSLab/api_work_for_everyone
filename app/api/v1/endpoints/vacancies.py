@@ -20,7 +20,6 @@ from schemas.vacancies import (
     VacancyDetailsOutSchema,
 )
 
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 

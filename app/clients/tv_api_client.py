@@ -7,7 +7,6 @@ import httpx
 
 from exceptions.api_clients import TVAPIRequestError
 
-
 logger = logging.getLogger(__name__)
 
 

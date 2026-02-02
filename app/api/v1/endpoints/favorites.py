@@ -13,10 +13,9 @@ from exceptions.repositories import (
 )
 from exceptions.services import VacanciesServiceError
 from exceptions.users import UserNotFound
-from exceptions.vacancies import VacancyNotFoundError, VacancyAlreadyInFavoritesError
+from exceptions.vacancies import VacancyAlreadyInFavoritesError, VacancyNotFoundError
 from schemas.users import MsgSchema
 from schemas.vacancies import FavoriteVacanciesListSchema, VacancyAddFavoriteSchema
-
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

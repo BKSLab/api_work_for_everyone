@@ -9,7 +9,6 @@ from exceptions.repositories import RegionRepositoryError
 from exceptions.services import RegionServiceError
 from schemas.region import RegionSchema
 
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 

@@ -36,7 +36,6 @@ from schemas.users import (
 )
 from utils.create_token import create_token_pair
 
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 

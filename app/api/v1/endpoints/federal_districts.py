@@ -1,12 +1,11 @@
 import logging
 
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, HTTPException, status
 
+from dependencies.services import RegionServiceDep
 from exceptions.repositories import RegionRepositoryError
 from exceptions.services import RegionServiceError
-from dependencies.services import RegionServiceDep
 from schemas.region import FederalDistrictSchema
-
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

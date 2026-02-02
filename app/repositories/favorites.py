@@ -2,13 +2,12 @@ import logging
 from pprint import pformat
 
 from sqlalchemy import Result, func, insert, select
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.favorites import FavoriteVacancies
 from exceptions.repositories import FavoritesRepositoryError
 from exceptions.vacancies import VacancyAlreadyInFavoritesError
-
 
 logger = logging.getLogger(__name__)
 

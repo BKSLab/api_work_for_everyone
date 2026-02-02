@@ -8,7 +8,6 @@ from db.models.federal_districts import FederalDistricts
 from db.models.regions import Region
 from exceptions.repositories import RegionRepositoryError
 
-
 logger = logging.getLogger(__name__)
 
 
