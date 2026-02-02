@@ -1,13 +1,15 @@
-import asyncio
-from pprint import pformat, pprint
+import logging
+from pprint import pformat
 
 import httpx
+from fastapi import status
 
-from core.config_logger import logger
 from core.settings import get_settings
-from exceptions.service_exceptions import HHAPIRequestError
+from exceptions.api_clients import HHAPIRequestError
+
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class HHClient:
@@ -16,44 +18,59 @@ class HHClient:
     SOCIAL_PROTECTED_HH: str = 'accept_handicapped'
     VACANCIES_PER_ONE_PAGE_HH: int = 100
     FIRST_PAGE: int = 0
-    VACANCY_URL: str = 'https://api.hh.ru/vacancies/'
+    FIRST_ELEMENT: int = 1
+    VACANCY_URL: str = "https://api.hh.ru/vacancies/"
 
     def __init__(self, httpx_client: httpx.AsyncClient):
         self.httpx_client = httpx_client
-        self.access_token_hh = settings.app.access_token_hh.get_secret_value()
-
-    async def request_to_api_hh(self, url: str, params: dict | None = None) -> dict:
-        """Запрос к API портала 'Работа России'."""
+        self.headers = {
+            "Authorization": f"Bearer {settings.app.access_token_hh.get_secret_value()}"
+        }
+            
+    async def _request_to_api_hh(self, url: str, params: dict | None = None) -> dict:
+        """Запрос к API портала 'hh.ru'."""
+        logger.info("Запрос к HH API. URL: %s, Параметры: %s", url, pformat(params))
         try:
-            headers = {'Authorization': f'Bearer {self.access_token_hh}'}
             response = await self.httpx_client.get(
                 url=url,
-                headers=headers,
+                headers=self.headers,
                 params=params or {},
             )
+
             response.raise_for_status()
             response_data = response.json()
-            return response_data
+            return {"status": True, "search_status": "success", "response_data": response_data}
+
         except httpx.HTTPStatusError as error:
+            status_code = error.response.status_code
+            if status_code == status.HTTP_404_NOT_FOUND:
+                logger.warning(
+                    "Поиск по HH API не дал результатов (404 Not Found). URL: %s, Параметры: %s",
+                    error.request.url, pformat(params),
+                )
+                return {"status": True, "search_status": "not_found", "response_data": {}}
+
             logger.error(
-                f'Получен HTTP статус {error.response.status_code} при '
-                f'запросе к {url} api hh. Текст ошибки: {error.response.text}.'
+                "Ошибка статуса HTTP при запросе к HH API. Статус: %s, URL: %s, Ответ: %s",
+                status_code, error.request.url, error.response.text,
             )
+            return {"status": False, "search_status": "request_error", "response_data": {}}
+
         except httpx.RequestError as error:
             logger.error(
-                f'Ошибка при запросе к {url}. api hh'
-                f'Тип ошибки: {type(error).__name__}. '
-                f'Сообщение: {str(error)}.'
+                "Ошибка запроса к HH API. URL: %s, Ошибка: %s",
+                error.request.url, error,
             )
+            return {"status": False, "search_status": "request_error", "response_data": {}}
+
         except Exception as error:
             logger.error(
-                'При работе метода send_request_api_bitrix произошла '
-                f'ошибка. Текст ошибки: {str(error)} '
-                f'Тип ошибки: {type(error).__name__}.'
+                "Непредвиденная ошибка в _request_to_api_hh. Ошибка: %s",
+                error,exc_info=True,
             )
-        raise HHAPIRequestError(params)
+            return {"status": False, "search_status": "request_error", "response_data": {}}
 
-    async def get_many_vacansies_in_location(
+    async def _get_many_vacansies_in_location(
         self,
         region_code_hh: str,
         location: str,
@@ -61,113 +78,100 @@ class HHClient:
         first_page_vacansies: list,
     ):
         """Загружает вакансии, когда страниц больше чем одна."""
-        try:
-            for page in range(1, count_pages):
-                result = await self.request_to_api_hh(
-                    url=self.VACANCY_URL,
-                    params={
-                        'page': page,
-                        'per_page': self.VACANCIES_PER_ONE_PAGE_HH,
-                        'area': region_code_hh,
-                        'text': location,
-                        'label': self.SOCIAL_PROTECTED_HH,
-                    }
+        logger.info(
+            'Загрузка нескольких страниц вакансий. Регион: %s, Локация: %s, Страниц: %s',
+            region_code_hh,
+            location,
+            count_pages,
+        )
+        all_vacancies = first_page_vacansies.copy()
+        for page in range(1, count_pages):
+            logger.info('Загрузка страницы %s из %s.', page + 1, count_pages)
+            params = {
+                "page": page,
+                "per_page": self.VACANCIES_PER_ONE_PAGE_HH,
+                "area": region_code_hh,
+                "text": location,
+                "label": self.SOCIAL_PROTECTED_HH,
+            }
+            vacansies_request_result = await self._request_to_api_hh(
+                url=self.VACANCY_URL, params=params
+            )
+            status = vacansies_request_result.get("status")
+            if not status:
+                raise HHAPIRequestError(
+                    error_details="Failed to load vacansies postings when multi-page loading.",
+                    request_url=self.VACANCY_URL,
+                    request_params=params
                 )
-                vacancies_for_page: list = result.get('items', [])
-                first_page_vacansies.extend(vacancies_for_page)
-            return first_page_vacansies
-        except HHAPIRequestError:
-            raise
+            response_data: dict = vacansies_request_result.get("response_data", {})
+            vacancies_for_page: list = response_data.get('items', [])
+            all_vacancies.extend(vacancies_for_page)
 
-    # async def get_many_vacansies_in_location(
-    #     self,
-    #     region_code_hh: str,
-    #     location: str,
-    #     count_pages: int,
-    #     first_page_vacansies: list,
-    # ):
-    #     try:
-    #         tasks = [
-    #             self.request_to_api_hh(
-    #                 url=self.VACANCY_URL,
-    #                 params={
-    #                     'page': page,
-    #                     'per_page': self.VACANCIES_PER_ONE_PAGE_HH,
-    #                     'area': region_code_hh,
-    #                     'text': location,
-    #                     'label': self.SOCIAL_PROTECTED_HH,
-    #                 }
-    #             )
-    #             for page in range(1, count_pages)
-    #         ]
-
-    #         # Параллельное выполнение всех запросов
-    #         results = await asyncio.gather(*tasks, return_exceptions=True)
-    #         for result in results:
-    #             if isinstance(result, Exception):
-    #                 logger.error(
-    #                     f'Ошибка при выполнении запроса к API hh: '
-    #                     f'{type(result).__name__}: {str(result)}'
-    #                 )
-    #             else:
-    #                 try:
-    #                     vacancies_for_page: list = result.get('items', [])
-    #                     first_page_vacansies.extend(vacancies_for_page)
-    #                 except Exception as error:
-    #                     logger.error(
-    #                         'Ошибка при обработке данных из API hh: '
-    #                         f'{type(error).__name__}: {str(error)}. '
-    #                         f'Результат: {result}'
-    #                     )
-    #                     raise HHAPIRequestError(
-    #                         params={
-    #                             'region_code_hh': region_code_hh,
-    #                             'location': location,
-    #                             'count_pages': count_pages,
-    #                         }
-    #                     )
-    #         return first_page_vacansies
-    #     except HHAPIRequestError:
-    #         raise
+        logger.info('Всего загружено %s вакансий.', len(all_vacancies))
+        return all_vacancies
 
     async def get_vacansies_in_location(
-        self,
-        location: str,
-        region_code_hh: str,
+        self, location: str, region_code_hh: str,
     ) -> list[dict]:
         """Получение данных вакансий в регионе."""
-        try:
-            params = {
-                'page': self.FIRST_PAGE,
-                'per_page': self.VACANCIES_PER_ONE_PAGE_HH,
-                'area': region_code_hh,
-                'text': location,
-                'label': self.SOCIAL_PROTECTED_HH,
-            }
-            first_page_data = await self.request_to_api_hh(
-                url=self.VACANCY_URL,
-                params=params
+        logger.info("Поиск вакансий на hh.ru. Регион: %s, Локация: %s", region_code_hh, location)
+        params = {
+            "page": self.FIRST_PAGE,
+            "per_page": self.VACANCIES_PER_ONE_PAGE_HH,
+            "area": region_code_hh,
+            "text": location,
+            "label": self.SOCIAL_PROTECTED_HH,
+        }
+        vacansies_request_result = await self._request_to_api_hh(
+            url=self.VACANCY_URL, params=params
+        )
+        status = vacansies_request_result.get("status")
+        if not status:
+            raise HHAPIRequestError(
+                error_details="Failed to complete first request while loading vacancies.",
+                request_url=self.VACANCY_URL,
+                request_params=params
             )
-            count_pages = first_page_data.get('pages')
-            logger.info(f'count_pages: {count_pages}')
-            if count_pages > 1:
-                return await self.get_many_vacansies_in_location(
-                    region_code_hh=region_code_hh,
-                    location=location,
-                    count_pages=count_pages,
-                    first_page_vacansies=first_page_data.get('items', [])
-                )
-            return first_page_data.get('items', [])
-        except HHAPIRequestError:
-            raise
 
-    async def get_one_vacancy(self, vacancy_id: str) -> list[dict]:
-        """Получение подробную информацию по одной вакаснии."""
-        try:
-            vacancy = await self.request_to_api_hh(
-                url=''.join([self.VACANCY_URL, vacancy_id])
+        response_data: dict = vacansies_request_result.get("response_data", {})
+        count_pages = response_data.get("pages", 0)
+        logger.info("Найдено %s страниц с вакансиями.", count_pages)
+        
+        found_vacancies = response_data.get("items", [])
+        if count_pages > self.FIRST_ELEMENT:
+            found_vacancies = await self._get_many_vacansies_in_location(
+                region_code_hh=region_code_hh,
+                location=location,
+                count_pages=count_pages,
+                first_page_vacansies=found_vacancies,
             )
-            pprint(vacancy)
-            return vacancy
-        except HHAPIRequestError:
-            raise
+        
+        logger.info(
+            "Найдено %s вакансий для региона %s и локации %s.",
+            len(found_vacancies), region_code_hh, location,
+        )
+        return found_vacancies
+
+    async def get_one_vacancy(self, vacancy_id: str) -> dict:
+        """Получение подробную информацию по одной вакаснии."""
+        logger.info("Поиск одной вакансии по vacancy_id=%s", vacancy_id)
+        request_url = "".join([self.VACANCY_URL, vacancy_id])
+        vacancy_request_result = await self._request_to_api_hh(
+            url=request_url
+        )
+        status = vacancy_request_result.get("status")
+        search_status = vacancy_request_result.get("search_status")
+        if not status:
+            raise HHAPIRequestError(
+                error_details="Failed to complete request while retrieving data for one vacancy.",
+                request_url=request_url
+            )
+        
+        if search_status == "success":
+            logger.info("Вакансия с vacancy_id=%s успешно найдена.", vacancy_id)
+        elif search_status == "not_found":
+            logger.warning("Вакансия с vacancy_id=%s не найдена.", vacancy_id)
+            
+        return vacancy_request_result
+    

@@ -6,7 +6,7 @@ from fastapi import Depends
 
 async def get_http_session() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Генератор для создания HTTP-сессии."""
-    async with httpx.AsyncClient() as httpx_client:
+    async with httpx.AsyncClient(timeout=60) as httpx_client:
         yield httpx_client
 
 

@@ -2,19 +2,20 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from pprint import pformat
 from typing import Any
 
 import jwt
 
 from core.settings import get_settings
-from exceptions.jwt_exceptions import JWTManagerError
+from exceptions.jwt_manager import JWTManagerError
 
 settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
 
-
+# класс переработан
 class JWTManager:
     """Класс для работы с токенами."""
 
@@ -80,9 +81,11 @@ class JWTManager:
             )
             return token
 
-        except Exception as e:
-            logger.exception("Ошибка при кодировании access токена: %s", e)
-            raise JWTManagerError(message=f"Ошибка при создании access токена: {e}")
+        except Exception as error:
+            raise JWTManagerError(
+                error_details=f"payload for token creation:\n{pformat(payload)}",
+                message="Failed to create access token and refresh token"
+            ) from error
 
     def decode_access_token(self, token: str) -> dict[str, Any]:
         """Декодирует и проверяет access JWT токен."""
@@ -95,8 +98,11 @@ class JWTManager:
             )
 
             if decoded.get("type") != "access":
-                raise JWTManagerError(message="Некорректный тип токена: ожидался access.")
-
+                raise JWTManagerError(
+                    error_details=f"token data: {token}",
+                    message="Invalid token type: expected access token"
+                )
+    
             exp = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
             logger.debug(
                 "Access токен успешно декодирован. Пользователь: %s, истекает в %s",
@@ -105,12 +111,19 @@ class JWTManager:
             )
             return decoded
 
-        except jwt.ExpiredSignatureError:
+        except jwt.ExpiredSignatureError as error:
             logger.warning("Попытка использовать просроченный access токен.")
-            raise JWTManagerError(message="Срок действия access токена истёк.")
-        except jwt.InvalidTokenError as e:
+            raise JWTManagerError(
+                error_details=f"token data: {token}",
+                message="The access token has expired."
+            ) from error
+
+        except jwt.InvalidTokenError as error:
             logger.warning("Некорректный access токен: %s", e)
-            raise JWTManagerError(message=f"Некорректный access токен: {e}")
+            raise JWTManagerError(
+                error_details=f"token data: {token}",
+                message="An invalid access token was passed.."
+            ) from error
 
     def create_refresh_token(self, payload: dict[str, Any]) -> str:
         """Создает refresh JWT токен."""
@@ -130,9 +143,11 @@ class JWTManager:
                 refresh_payload["exp"],
             )
             return token
-        except Exception as e:
-            logger.exception("Ошибка при кодировании refresh токена: %s", e)
-            raise JWTManagerError(message=f"Ошибка при создании refresh токена: {e}")
+        except Exception as error:
+            raise JWTManagerError(
+                error_details=f"refresh_payload data:\n{pformat(refresh_payload)}",
+                message="Error creating refresh token."
+            ) from error
 
     def decode_refresh_token(self, token: str) -> dict[str, Any]:
         """Декодирует и проверяет refresh JWT токен."""
@@ -145,7 +160,10 @@ class JWTManager:
             )
 
             if decoded["type"] != "refresh":
-                raise JWTManagerError(message="Некорректный тип токена: ожидался refresh.")
+                raise JWTManagerError(
+                    error_details=f"token data: {token}",
+                    message="Invalid token type: expected refresh token"
+                )
 
             exp = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
             logger.debug(
@@ -155,9 +173,13 @@ class JWTManager:
             )
             return decoded
 
-        except jwt.ExpiredSignatureError:
-            logger.warning("Попытка использовать просроченный refresh токен.")
-            raise JWTManagerError(message="Срок действия refresh токена истёк.")
-        except jwt.InvalidTokenError as e:
-            logger.warning("Некорректный refresh токен: %s", e)
-            raise JWTManagerError(message=f"Некорректный refresh токен: {e}")
+        except jwt.ExpiredSignatureError as error:
+            raise JWTManagerError(
+                error_details=f"token data: {token}",
+                message="The refresh token has expired."
+            ) from error
+        except jwt.InvalidTokenError as error:
+            raise JWTManagerError(
+                error_details=f"token data: {token}",
+                message="Invalid refresh token."
+            ) from error

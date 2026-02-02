@@ -2,6 +2,12 @@
 
 set -e
 
+# Добавляем в PYTHONPATH и корневую директорию проекта (/app),
+# и директорию с исходным кодом (/app/app).
+# Это позволяет и команде запуска найти app.main, и самому приложению
+# найти свои внутренние модули (api, core и т.д.).
+export PYTHONPATH="/app:/app/app:${PYTHONPATH}"
+
 echo "application of migrations"
 alembic upgrade head
 

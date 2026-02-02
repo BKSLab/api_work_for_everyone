@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from .endpoints import (
     auth,
+    favorites,
     federal_districts,
     regions,
     vacancies,
@@ -34,4 +35,10 @@ router.include_router(
     auth.router,
     prefix='/auth',
     tags=['Auth']
+)
+
+router.include_router(
+    favorites.router,
+    prefix='/favorites',
+    tags=['Favorites']
 )

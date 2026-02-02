@@ -1,0 +1,512 @@
+[
+    {
+        "code_tv": "01",
+        "name": "Республика Адыгея (Адыгея)",
+        "federal_district_code": "40",
+        "code_hh": "1422"
+    },
+    {
+        "code_tv": "02",
+        "name": "Республика Башкортостан",
+        "federal_district_code": "33",
+        "code_hh": "1347"
+    },
+    {
+        "code_tv": "03",
+        "name": "Республика Бурятия",
+        "federal_district_code": "42",
+        "code_hh": "1118"
+    },
+    {
+        "code_tv": "04",
+        "name": "Республика Алтай",
+        "federal_district_code": "41",
+        "code_hh": "1216"
+    },
+    {
+        "code_tv": "05",
+        "name": "Республика Дагестан",
+        "federal_district_code": "38",
+        "code_hh": "1424"
+    },
+    {
+        "code_tv": "06",
+        "name": "Республика Ингушетия",
+        "federal_district_code": "38",
+        "code_hh": "1434"
+    },
+    {
+        "code_tv": "07",
+        "name": "Кабардино-Балкарская Республика",
+        "federal_district_code": "38",
+        "code_hh": "1463"
+    },
+    {
+        "code_tv": "08",
+        "name": "Республика Калмыкия",
+        "federal_district_code": "40",
+        "code_hh": "1553"
+    },
+    {
+        "code_tv": "09",
+        "name": "Карачаево-Черкесская Республика",
+        "federal_district_code": "38",
+        "code_hh": "1471"
+    },
+    {
+        "code_tv": "10",
+        "name": "Республика Карелия",
+        "federal_district_code": "31",
+        "code_hh": "1077"
+    },
+    {
+        "code_tv": "11",
+        "name": "Республика Коми",
+        "federal_district_code": "31",
+        "code_hh": "1041"
+    },
+    {
+        "code_tv": "12",
+        "name": "Республика Марий Эл",
+        "federal_district_code": "33",
+        "code_hh": "1620"
+    },
+    {
+        "code_tv": "13",
+        "name": "Республика Мордовия",
+        "federal_district_code": "33",
+        "code_hh": "1556"
+    },
+    {
+        "code_tv": "14",
+        "name": "Республика Саха (Якутия)",
+        "federal_district_code": "42",
+        "code_hh": "1174"
+    },
+    {
+        "code_tv": "15",
+        "name": "Республика Северная Осетия - Алания",
+        "federal_district_code": "38",
+        "code_hh": "1475"
+    },
+    {
+        "code_tv": "16",
+        "name": "Республика Татарстан (Татарстан)",
+        "federal_district_code": "33",
+        "code_hh": "1624"
+    },
+    {
+        "code_tv": "17",
+        "name": "Республика Тыва",
+        "federal_district_code": "41",
+        "code_hh": "1169"
+    },
+    {
+        "code_tv": "18",
+        "name": "Удмуртская Республика",
+        "federal_district_code": "33",
+        "code_hh": "1646"
+    },
+    {
+        "code_tv": "19",
+        "name": "Республика Хакасия",
+        "federal_district_code": "41",
+        "code_hh": "1187"
+    },
+    {
+        "code_tv": "20",
+        "name": "Чеченская Республика",
+        "federal_district_code": "38",
+        "code_hh": "1500"
+    },
+    {
+        "code_tv": "21",
+        "name": "Чувашская Республика - Чувашия",
+        "federal_district_code": "33",
+        "code_hh": "1652"
+    },
+    {
+        "code_tv": "22",
+        "name": "Алтайский край",
+        "federal_district_code": "41",
+        "code_hh": "1217"
+    },
+    {
+        "code_tv": "23",
+        "name": "Краснодарский край",
+        "federal_district_code": "40",
+        "code_hh": "1438"
+    },
+    {
+        "code_tv": "24",
+        "name": "Красноярский край",
+        "federal_district_code": "41",
+        "code_hh": "1146"
+    },
+    {
+        "code_tv": "25",
+        "name": "Приморский край",
+        "federal_district_code": "42",
+        "code_hh": "1948"
+    },
+    {
+        "code_tv": "26",
+        "name": "Ставропольский край",
+        "federal_district_code": "38",
+        "code_hh": "1481"
+    },
+    {
+        "code_tv": "27",
+        "name": "Хабаровский край",
+        "federal_district_code": "42",
+        "code_hh": "1975"
+    },
+    {
+        "code_tv": "28",
+        "name": "Амурская область",
+        "federal_district_code": "42",
+        "code_hh": "1932"
+    },
+    {
+        "code_tv": "29",
+        "name": "Архангельская область",
+        "federal_district_code": "31",
+        "code_hh": "1008"
+    },
+    {
+        "code_tv": "30",
+        "name": "Астраханская область",
+        "federal_district_code": "40",
+        "code_hh": "1505"
+    },
+    {
+        "code_tv": "31",
+        "name": "Белгородская область",
+        "federal_district_code": "30",
+        "code_hh": "1817"
+    },
+    {
+        "code_tv": "32",
+        "name": "Брянская область",
+        "federal_district_code": "30",
+        "code_hh": "1828"
+    },
+    {
+        "code_tv": "33",
+        "name": "Владимирская область",
+        "federal_district_code": "30",
+        "code_hh": "1716"
+    },
+    {
+        "code_tv": "34",
+        "name": "Волгоградская область",
+        "federal_district_code": "40",
+        "code_hh": "1511"
+    },
+    {
+        "code_tv": "35",
+        "name": "Вологодская область",
+        "federal_district_code": "31",
+        "code_hh": "1739"
+    },
+    {
+        "code_tv": "36",
+        "name": "Воронежская область",
+        "federal_district_code": "30",
+        "code_hh": "1844"
+    },
+    {
+        "code_tv": "37",
+        "name": "Ивановская область",
+        "federal_district_code": "30",
+        "code_hh": "1754"
+    },
+    {
+        "code_tv": "38",
+        "name": "Иркутская область",
+        "federal_district_code": "41",
+        "code_hh": "1124"
+    },
+    {
+        "code_tv": "39",
+        "name": "Калининградская область",
+        "federal_district_code": "31",
+        "code_hh": "1020"
+    },
+    {
+        "code_tv": "40",
+        "name": "Калужская область",
+        "federal_district_code": "30",
+        "code_hh": "1859"
+    },
+    {
+        "code_tv": "41",
+        "name": "Камчатский край",
+        "federal_district_code": "42",
+        "code_hh": "1943"
+    },
+    {
+        "code_tv": "42",
+        "name": "Кемеровская область - Кузбасс",
+        "federal_district_code": "41",
+        "code_hh": "1229"
+    },
+    {
+        "code_tv": "43",
+        "name": "Кировская область",
+        "federal_district_code": "33",
+        "code_hh": "1661"
+    },
+    {
+        "code_tv": "44",
+        "name": "Костромская область",
+        "federal_district_code": "30",
+        "code_hh": "1771"
+    },
+    {
+        "code_tv": "45",
+        "name": "Курганская область",
+        "federal_district_code": "34",
+        "code_hh": "1308"
+    },
+    {
+        "code_tv": "46",
+        "name": "Курская область",
+        "federal_district_code": "30",
+        "code_hh": "1880"
+    },
+    {
+        "code_tv": "47",
+        "name": "Ленинградская область",
+        "federal_district_code": "31",
+        "code_hh": "145"
+    },
+    {
+        "code_tv": "48",
+        "name": "Липецкая область",
+        "federal_district_code": "30",
+        "code_hh": "1890"
+    },
+    {
+        "code_tv": "49",
+        "name": "Магаданская область",
+        "federal_district_code": "42",
+        "code_hh": "1946"
+    },
+    {
+        "code_tv": "50",
+        "name": "Московская область",
+        "federal_district_code": "30",
+        "code_hh": "2019"
+    },
+    {
+        "code_tv": "51",
+        "name": "Мурманская область",
+        "federal_district_code": "31",
+        "code_hh": "1061"
+    },
+    {
+        "code_tv": "52",
+        "name": "Нижегородская область",
+        "federal_district_code": "33",
+        "code_hh": "1679"
+    },
+    {
+        "code_tv": "53",
+        "name": "Новгородская область",
+        "federal_district_code": "31",
+        "code_hh": "1051"
+    },
+    {
+        "code_tv": "54",
+        "name": "Новосибирская область",
+        "federal_district_code": "41",
+        "code_hh": "1202"
+    },
+    {
+        "code_tv": "55",
+        "name": "Омская область",
+        "federal_district_code": "41",
+        "code_hh": "1255"
+    },
+    {
+        "code_tv": "56",
+        "name": "Оренбургская область",
+        "federal_district_code": "33",
+        "code_hh": "1563"
+    },
+    {
+        "code_tv": "57",
+        "name": "Орловская область",
+        "federal_district_code": "30",
+        "code_hh": "1898"
+    },
+    {
+        "code_tv": "58",
+        "name": "Пензенская область",
+        "federal_district_code": "33",
+        "code_hh": "1575"
+    },
+    {
+        "code_tv": "59",
+        "name": "Пермский край",
+        "federal_district_code": "33",
+        "code_hh": "1317"
+    },
+    {
+        "code_tv": "60",
+        "name": "Псковская область",
+        "federal_district_code": "31",
+        "code_hh": "1090"
+    },
+    {
+        "code_tv": "61",
+        "name": "Ростовская область",
+        "federal_district_code": "40",
+        "code_hh": "1530"
+    },
+    {
+        "code_tv": "62",
+        "name": "Рязанская область",
+        "federal_district_code": "30",
+        "code_hh": "1704"
+    },
+    {
+        "code_tv": "63",
+        "name": "Самарская область",
+        "federal_district_code": "33",
+        "code_hh": "1586"
+    },
+    {
+        "code_tv": "64",
+        "name": "Саратовская область",
+        "federal_district_code": "33",
+        "code_hh": "1596"
+    },
+    {
+        "code_tv": "65",
+        "name": "Сахалинская область",
+        "federal_district_code": "42",
+        "code_hh": "1960"
+    },
+    {
+        "code_tv": "66",
+        "name": "Свердловская область",
+        "federal_district_code": "34",
+        "code_hh": "1261"
+    },
+    {
+        "code_tv": "67",
+        "name": "Смоленская область",
+        "federal_district_code": "30",
+        "code_hh": "1103"
+    },
+    {
+        "code_tv": "68",
+        "name": "Тамбовская область",
+        "federal_district_code": "30",
+        "code_hh": "1905"
+    },
+    {
+        "code_tv": "69",
+        "name": "Тверская область",
+        "federal_district_code": "30",
+        "code_hh": "1783"
+    },
+    {
+        "code_tv": "70",
+        "name": "Томская область",
+        "federal_district_code": "41",
+        "code_hh": "1255"
+    },
+    {
+        "code_tv": "71",
+        "name": "Тульская область",
+        "federal_district_code": "30",
+        "code_hh": "1913"
+    },
+    {
+        "code_tv": "72",
+        "name": "Тюменская область",
+        "federal_district_code": "34",
+        "code_hh": "1342"
+    },
+    {
+        "code_tv": "73",
+        "name": "Ульяновская область",
+        "federal_district_code": "33",
+        "code_hh": "1614"
+    },
+    {
+        "code_tv": "74",
+        "name": "Челябинская область",
+        "federal_district_code": "34",
+        "code_hh": "1384"
+    },
+    {
+        "code_tv": "75",
+        "name": "Забайкальский край",
+        "federal_district_code": "42",
+        "code_hh": "1192"
+    },
+    {
+        "code_tv": "76",
+        "name": "Ярославская область",
+        "federal_district_code": "30",
+        "code_hh": "1806"
+    },
+    {
+        "code_tv": "77",
+        "name": "Москва",
+        "federal_district_code": "30",
+        "code_hh": "1"
+    },
+    {
+        "code_tv": "78",
+        "name": "Санкт-Петербург",
+        "federal_district_code": "31",
+        "code_hh": "2"
+    },
+    {
+        "code_tv": "79",
+        "name": "Еврейская автономная область",
+        "federal_district_code": "42",
+        "code_hh": "1941"
+    },
+    {
+        "code_tv": "83",
+        "name": "Ненецкий автономный округ",
+        "federal_district_code": "31",
+        "code_hh": "1985"
+    },
+    {
+        "code_tv": "86",
+        "name": "Ханты-Мансийский автономный округ - Югра",
+        "federal_district_code": "34",
+        "code_hh": "1368"
+    },
+    {
+        "code_tv": "87",
+        "name": "Чукотский автономный округ",
+        "federal_district_code": "42",
+        "code_hh": "1982"
+    },
+    {
+        "code_tv": "89",
+        "name": "Ямало-Ненецкий автономный округ",
+        "federal_district_code": "34",
+        "code_hh": "1414"
+    },
+    {
+        "code_tv": "91",
+        "name": "Республика Крым",
+        "federal_district_code": "40",
+        "code_hh": "2114"
+    },
+    {
+        "code_tv": "92",
+        "name": "Севастополь",
+        "federal_district_code": "40",
+        "code_hh": "2114"
+    }
+]
