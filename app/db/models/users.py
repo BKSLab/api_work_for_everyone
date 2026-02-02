@@ -102,7 +102,7 @@ class PasswordResetCode(Base):
         doc='ID пользователя.'
     )
     code: Mapped[str] = mapped_column(
-        String(length=20), # Assuming a similar length for reset codes
+        String(length=20),
         nullable=False,
         doc='Код сброса пароля.'
     )

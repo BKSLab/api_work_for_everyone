@@ -5,6 +5,7 @@ from pathlib import Path
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
@@ -40,7 +41,7 @@ class DBSettings(SettingsBase):
     postgres_host: SecretStr
     postgres_user: SecretStr
     postgres_password: SecretStr
-    postgres_db: SecretStr
+    postgres_name: SecretStr
 
     @property
     def url_connect(self) -> str:
@@ -48,7 +49,7 @@ class DBSettings(SettingsBase):
             f'postgresql+asyncpg://{self.postgres_user.get_secret_value()}:'
             f'{self.postgres_password.get_secret_value()}@'
             f'{self.postgres_host.get_secret_value()}/'
-            f'{self.postgres_db.get_secret_value()}'
+            f'{self.postgres_name.get_secret_value()}'
         )
 
 

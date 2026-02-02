@@ -7,7 +7,7 @@ from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 
 from dependencies.services import BlocklistServiceDep
-from exceptions.jwt_exceptions import JWTManagerError
+from exceptions.jwt_manager import JWTManagerError
 from schemas.users import RefreshTokenRequestSchema
 from utils.jwt.manager import JWTManager
 
@@ -80,11 +80,11 @@ async def get_current_user_payload(
             "Доступ разрешен для пользователя: %s", payload.get("sub")
         )
         return payload
-    except JWTManagerError as e:
-        logger.warning("Ошибка валидации токена: %s", e.detail())
+    except JWTManagerError as error:
+        logger.warning("Ошибка валидации токена: %s", error)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=e.detail(),
+            detail=error.detail,
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -117,28 +117,20 @@ async def get_current_refresh_payload(
     Выбрасывает исключения:
     *   `HTTPException` (401): Если токен невалиден, просрочен или заблокирован.
     """
-    try:
-        payload = jwt_manager.decode_refresh_token(data.refresh_token)
-        if await blocklist_service.is_token_blocked(payload):
-            logger.warning(
-                "Попытка обновления с заблокированным refresh токеном (jti: %s)", payload.get("jti")
-            )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Refresh token has been revoked",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        logger.info(
-            "Refresh токен успешно валидирован для пользователя: %s", payload.get("sub")
+    payload = jwt_manager.decode_refresh_token(data.refresh_token)
+    if await blocklist_service.is_token_blocked(payload):
+        logger.warning(
+            "Попытка обновления с заблокированным refresh токеном (jti: %s)", payload.get("jti")
         )
-        return payload
-    except JWTManagerError as e:
-        logger.warning("Ошибка валидации refresh токена: %s", e.detail())
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=e.detail(),
+            detail="Refresh token has been revoked",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    logger.info(
+        "Refresh токен успешно валидирован для пользователя: %s", payload.get("sub")
+    )
+    return payload
 
 
 CurrentUserPayloadDep = Annotated[dict, Depends(get_current_user_payload)]

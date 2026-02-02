@@ -6,13 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from db.models.blocklist import BlockedToken
-from exceptions.repository_exceptions import BlocklistRepositoryError
+from exceptions.repositories import BlocklistRepositoryError
 
 logger = logging.getLogger(__name__)
 
 
 class BlocklistRepository:
-    """Репозиторий для работы с заблокированными токенами."""
+    """Репозиторий для работы с черным списком токенов в базе данных."""
 
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
@@ -25,10 +25,9 @@ class BlocklistRepository:
             await self.db_session.commit()
         except (SQLAlchemyError, Exception) as error:
             await self.db_session.rollback()
-            logger.error(
-                "Ошибка при добавлении токена в черный список: %s", error, exc_info=True
-            )
-            raise BlocklistRepositoryError(cause=error) from error
+            raise BlocklistRepositoryError(
+                error_details="Error adding token to blocklist."
+            ) from error
 
     async def is_token_blocked(self, jti: str) -> bool:
         """Проверяет, находится ли JTI токена в черном списке."""
@@ -38,7 +37,6 @@ class BlocklistRepository:
             )
             return result.scalar_one_or_none() is not None
         except (SQLAlchemyError, Exception) as error:
-            logger.error(
-                "Ошибка при проверки токена в черный список: %s", error, exc_info=True
-            )
-            raise BlocklistRepositoryError(cause=error) from error
+            raise BlocklistRepositoryError(
+                error_details="Error checking if token is in blocklist."
+            ) from error

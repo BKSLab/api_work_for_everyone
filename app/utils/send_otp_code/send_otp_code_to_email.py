@@ -6,10 +6,10 @@ from email.mime.text import MIMEText
 import aiosmtplib
 
 from core.settings import get_settings
+from exceptions.users import SendOtpCodeError
 from utils.send_otp_code.get_otp_code import generate_verified_code
 
 settings = get_settings()
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,7 +20,7 @@ async def send_otp_code_by_email(
         subject: str,
         retries: int = 4,
         delay: int = 1
-) -> str | None:
+) -> str:
     """Функция отправки пользователю кода для идентификации."""
     logger.info("Отправка кода верификации на адрес: %s", user_email)
     verified_code = generate_verified_code()
@@ -66,4 +66,4 @@ async def send_otp_code_by_email(
         "Не удалось отправить письмо на %s! Количество попыток: %s",
         user_email, last_attempt
     )
-    return None
+    raise SendOtpCodeError(email=user_email)

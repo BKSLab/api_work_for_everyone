@@ -18,6 +18,10 @@ class VacanciesInfoSchema(BaseModel):
     all_vacancies_count: int
     vacancies_count_tv: int
     vacancies_count_hh: int
+    error_request_hh: bool
+    error_request_tv: bool
+    error_details_hh: str
+    error_details_tv: str
     location: str
     region_name: str
 
@@ -49,6 +53,7 @@ class VacanciesListSchema(BaseModel):
 
 
 class VacancyDetailsOutSchema(BaseModel):
+    status: str
     vacancy_name: str
     vacancy_id: str
     vacancy_url: str
@@ -63,3 +68,14 @@ class VacancyDetailsOutSchema(BaseModel):
     employer_email: str
     contact_person: str
     employment: str
+
+
+class FavoriteVacanciesListSchema(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[VacancyDetailsOutSchema]
+
+
+class VacancyAddFavoriteSchema(BaseModel):
+    vacancy_id: str

@@ -1,3 +1,4 @@
+import logging
 from pprint import pformat
 
 from fastapi import FastAPI, Request, status
@@ -12,34 +13,38 @@ from api.v1 import router as v1_router
 from core.config_logger import logger
 from core.limiter import limiter
 from db.session import async_session_factory
-from dependencies.services import check_db_connection
-from exceptions.service_exceptions import RegionStartupError
-from repositories.region_repository import RegionRepository
-from services.region_service import RegionService
+from exceptions.regions import RegionDataLoadError
+from exceptions.repositories import RegionRepositoryError
+from repositories.regions import RegionRepository
+from services.regions import RegionService
+from utils.check_db import check_db_connection
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Функция управления жизненным циклом приложения."""
-    logger.info('>>> Lifespan STARTED <<<')
+    logger.info(">>> Lifespan STARTED <<<")
     try:
         async with async_session_factory() as db_session:
-            db_session: AsyncSession
-            if not await check_db_connection(db_session):
-                raise RuntimeError('Database connection test failed')
+
+            # Проверка подключения к БД. При ошибки поднимает исключение RuntimeError
+            await check_db_connection(db_session=db_session)
+            
+            # cоздание сервиса регионов и предзагрузка данных о регионах
             region_service = RegionService(
                 region_repository=RegionRepository(db_session=db_session)
             )
-            await region_service.preload_region_data()
-    except RegionStartupError as error:
+            await region_service.initialize_region_data()
+    
+    except (RegionRepositoryError, RegionDataLoadError) as error:
         logger.critical(
-            f'An error occurred while loading region data: {error}.'
-            'The application will be stopped.'
+            "An error occurred while loading region data: %s."
+            "The application will be stopped.", error=str(error)
         )
         raise
-    logger.info('>>> Application STARTED successfully <<<')
+    logger.info(">>> Application STARTED successfully <<<")
     yield
-    logger.info('>>> Application STOPPING <<<')
+    logger.info(">>> Application STOPPING <<<")
 
 app = FastAPI(lifespan=lifespan)
 
