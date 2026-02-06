@@ -22,5 +22,5 @@ jobs:
           script: |
             cd /projects/api_work_for_everyone
             git pull
-            docker compose down && docker compose up -d
+            docker-compose down && docker-compose up -d --build
 
