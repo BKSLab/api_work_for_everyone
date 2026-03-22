@@ -14,16 +14,15 @@ class VacancyParseError(Exception):
 
     def __str__(self) -> str:
         return (
-            "Vacancy parsing error occurred while processing vacancy data. "
-            f"Source: {self.source}. "
-            f"Vacancy ID: {self.vacancy_id}. "
-            f"Employer code: {self.employer_code}. "
-            f"Error details: {self.error_details}"
+            f"Ошибка разбора вакансии. Источник: {self.source}. "
+            f"ID вакансии: {self.vacancy_id}. "
+            f"Код работодателя: {self.employer_code}. "
+            f"Подробности: {self.error_details}"
         )
 
     @property
     def detail(self) -> str:
         return (
-            f"An error occurred while processing vacancy data from the source '{self.source}'. "
-            f"Details: {self.error_details}."
+            f"Ошибка при обработке данных вакансии из источника '{self.source}'. "
+            f"Подробности: {self.error_details}."
         )

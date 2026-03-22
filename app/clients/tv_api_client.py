@@ -29,9 +29,9 @@ class TVClient:
         self.httpx_client = httpx_client
 
     async def _request_to_api_tv(self, url: str, params: dict | None = None) -> dict:
-        """Запрос к API портала 'Работа России'."""
+        """Запрос к API портала 'trudvsem.ru'."""
         logger.info(
-            "Запрос к Работа России API. URL: %s, Параметры: %s",
+            "🌐 Запрос к API trudvsem.ru. URL: %s, параметры: %s",
             url, pformat(params)
         )
         try:
@@ -46,24 +46,24 @@ class TVClient:
         except httpx.HTTPStatusError as error:
             status_code = error.response.status_code
             logger.error(
-                "Ошибка HTTP-статуса при запросе к API TrudVsem. Статус: %s, URL: %s, Ответ: %s",
+                "❌ Ошибка HTTP при запросе к API trudvsem.ru. Статус: %s, URL: %s, ответ: %s",
                 status_code, error.request.url, error.response.text,
             )
         except httpx.RequestError as error:
             logger.error(
-                "Ошибка запроса к API TrudVsem. URL: %s, Ошибка: %s",
+                "❌ Ошибка сети при запросе к API trudvsem.ru. URL: %s, детали: %s",
                 error.request.url, error,
             )
         except Exception as error:
             logger.error(
-                "Непредвиденная ошибка в _request_to_api_tv. Ошибка: %s",
+                "❌ Непредвиденная ошибка при запросе к API trudvsem.ru. Детали: %s",
                 error, exc_info=True,
             )
         return {"status": False, "response_data": {}}
 
-    def _get_count_pages(self, total_vacansies: int) -> int:
+    def _get_count_pages(self, total_vacancies: int) -> int:
         """Возвращает количество страниц при запросе вакансий."""
-        return ceil(total_vacansies / self.VACANCIES_PER_ONE_PAGE)
+        return ceil(total_vacancies / self.VACANCIES_PER_ONE_PAGE)
 
     def _create_vacancies_tasks(self, request_url: str, count_pages: int) -> list:
         """Создает список задач (корутин) для запроса вакансий."""
@@ -80,27 +80,26 @@ class TVClient:
         ]
 
     # TODO: посмотреть, что тут не так с исключенияями
-    async def _get_many_vacansies_in_region(
+    async def _get_many_vacancies_in_region(
         self,
         request_url: str,
         region_code_tv: str,
         count_pages: int,
-        first_page_vacansies: list[dict]
+        first_page_vacancies: list[dict]
     ) -> list[dict]:
         """Получение данных вакансий в регионе по нескольким страницам."""
         try:
             tasks = self._create_vacancies_tasks(request_url, count_pages)
 
             # Параллельное выполнение всех запросов
-            vacansies_request_result: list[dict] = await asyncio.gather(*tasks, return_exceptions=True)
-            for result in vacansies_request_result:
+            vacancies_request_result: list[dict] = await asyncio.gather(*tasks, return_exceptions=True)
+            for result in vacancies_request_result:
                 try:
-                    # обрабатываем данные запроса к API Работа России
                     status = result.get("status")
                     response_data: dict = result.get("response_data")
                     if not status:
                         raise TVAPIRequestError(
-                            error_details="Failed to load vacansies postings when multi-page loading.",
+                            error_details="Ошибка при загрузке вакансий (многостраничный запрос).",
                             request_url=request_url,
                             request_params={
                                 "social_protected": self.SOCIAL_PROTECTED,
@@ -108,61 +107,61 @@ class TVClient:
                             }
                         )
                     vacancies_for_page: list = response_data.get("results", {}).get("vacancies", [])
-                    first_page_vacansies.extend(vacancies_for_page)
+                    first_page_vacancies.extend(vacancies_for_page)
                 except Exception as error:
                     logger.error(
-                        "Ошибка при обработке данных из API TrudVsem. Ошибка: %s, Результат: %s",
+                        "❌ Ошибка при обработке данных API trudvsem.ru. Детали: %s, результат: %s",
                         error, result, exc_info=True,
                     )
                     raise TVAPIRequestError(
-                        error_details="Failed to load vacansies postings when multi-page loading.",
+                        error_details="Ошибка при загрузке вакансий (многостраничный запрос).",
                         request_url=request_url,
                         request_params={
                             "social_protected": self.SOCIAL_PROTECTED,
                             "region_code_tv": region_code_tv,
                         }
                     )
-            return first_page_vacansies
+            return first_page_vacancies
         except TVAPIRequestError:
             raise
 
-    async def get_vacansies_in_region(self, region_code_tv: str) -> list[dict]:
+    async def get_vacancies_in_region(self, region_code_tv: str) -> list[dict]:
         """Получение данных вакансий в регионе."""
-        logger.info("Поиск вакансий на сайте 'Работа России'. Код региона: %s", region_code_tv)
+        logger.info("🔍 Поиск вакансий на trudvsem.ru. Код региона: %s", region_code_tv)
 
         request_params = {"social_protected": self.SOCIAL_PROTECTED}
         request_url = self.ENDPOINT_REGION + region_code_tv
-        vacansies_request_result = await self._request_to_api_tv(
+        vacancies_request_result = await self._request_to_api_tv(
             url=request_url, params=request_params
         )
 
-        status = vacansies_request_result.get("status")
-        response_data: dict = vacansies_request_result.get("response_data")
-        first_page_vacansies = response_data.get("results", {}).get("vacancies", [])
+        status = vacancies_request_result.get("status")
+        response_data: dict = vacancies_request_result.get("response_data")
+        first_page_vacancies = response_data.get("results", {}).get("vacancies", [])
 
         if not status:
             raise TVAPIRequestError(
-                error_details="Failed to complete first request while loading vacancies.",
+                error_details="Ошибка при выполнении первого запроса вакансий.",
                 request_url=request_url,
                 request_params=request_params
             )
 
         count_pages = self._get_count_pages(
-            total_vacansies=response_data.get("meta", {}).get("total")
+            total_vacancies=response_data.get("meta", {}).get("total")
         )
-        logger.info("Найдено %s страниц с вакансиями.", count_pages)
+        logger.info("📋 Найдено страниц с вакансиями (trudvsem.ru): %s.", count_pages)
         if count_pages > self.FIRST_ELEMENT:
-            return await self._get_many_vacansies_in_region(
+            return await self._get_many_vacancies_in_region(
                 request_url=request_url,
                 region_code_tv=region_code_tv,
                 count_pages=count_pages,
-                first_page_vacansies=first_page_vacansies
+                first_page_vacancies=first_page_vacancies
             )
-        return first_page_vacansies
+        return first_page_vacancies
 
     async def get_one_vacancy(self, vacancy_id: str, employer_code: str) -> dict:
-        """Получение данных вакансий в регионе."""
-        logger.info("Поиск одной вакансии по vacancy_id=%s", vacancy_id)
+        """Получение данных по одной вакансии."""
+        logger.info("🔍 Запрос детальной информации по вакансии trudvsem.ru. ID: %s", vacancy_id)
         request_url = "/".join(
             [
                 self.ONE_VACANCY_ENDPOINT,
@@ -174,9 +173,9 @@ class TVClient:
         status = vacancy_request_result.get("status")
         if not status:
             raise TVAPIRequestError(
-                error_details="Failed to complete request while retrieving data for one vacancy.",
+                error_details="Ошибка при запросе детальной информации по вакансии.",
                 request_url=request_url
             )
-        
+
         vacancy: dict = vacancy_request_result.get("response_data")
         return vacancy.get("results", {}).get("vacancies", [None])[0].get("vacancy", {})

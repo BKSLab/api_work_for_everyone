@@ -13,7 +13,7 @@ from exceptions.regions import (
 )
 from exceptions.services import RegionServiceError
 from repositories.regions import RegionRepository
-from schemas.region import FederalDistrictSchema, RegionSchema
+from schemas.region import FederalDistrictSchema, RegionSchema, RegionSchemaDb
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ class RegionService:
         """Проверяет, что список регионов не пуст и содержит ожидаемое количество записей."""
         if not region_data or len(region_data) != self.EXPECTED_REGIONS_COUNT:
             logger.error(
-                "Data verification failed: either no data or incorrect "
-                "number of regions. Expected: %s, got: %s",
+                "❌ Проверка данных регионов не пройдена: нет данных или неверное количество записей. "
+                "Ожидалось: %s, получено: %s",
                 self.EXPECTED_REGIONS_COUNT, len(region_data) if region_data else 0
             )
             return False
@@ -43,9 +43,9 @@ class RegionService:
     async def _check_federal_districts_data(self, federal_districts_data: list[Region]) -> bool:
         """Проверяет, что список федеральных округов не пуст и содержит ожидаемое количество записей."""
         if not federal_districts_data or len(federal_districts_data) != self.EXPECTED_FD_COUNT:
-            logger.info(
-                "Data verification failed: either no data or incorrect "
-                "number of federal districts. Expected: %s, got: %s",
+            logger.error(
+                "❌ Проверка данных федеральных округов не пройдена: нет данных или неверное количество записей. "
+                "Ожидалось: %s, получено: %s",
                 self.EXPECTED_FD_COUNT, len(federal_districts_data) if federal_districts_data else 0
             )
             return False
@@ -66,7 +66,7 @@ class RegionService:
     def _read_file_data_regions(self) -> list[dict]:
         """Читает и возвращает данные о регионах из JSON-файла."""
         if not self.REGIONS_FILE.exists():
-            raise RegionDataLoadError(message="Regions data file not found.")
+            raise RegionDataLoadError(message="Файл с данными регионов не найден.")
 
         try:
 
@@ -75,14 +75,14 @@ class RegionService:
             return regions_data
 
         except json.JSONDecodeError as error:
-            raise RegionDataLoadError(message="Error decoding regions JSON data.") from error
+            raise RegionDataLoadError(message="Ошибка декодирования JSON-файла регионов.") from error
         except IOError as error:
-            raise RegionDataLoadError("Error reading regions data file.") from error
+            raise RegionDataLoadError("Ошибка чтения файла данных регионов.") from error
 
     def _read_file_data_federal_districts(self) -> list[dict]:
         """Читает и возвращает данные о федеральных округах из JSON-файла."""
         if not self.FEDERAL_DISTRICTS_FILE.exists():
-            raise RegionDataLoadError(message="Federal_districts data file not found.")
+            raise RegionDataLoadError(message="Файл с данными федеральных округов не найден.")
 
         try:
 
@@ -91,9 +91,9 @@ class RegionService:
             return federal_districts_data
 
         except json.JSONDecodeError as error:
-            raise RegionDataLoadError(message="Error decoding federal districts JSON data.") from error
+            raise RegionDataLoadError(message="Ошибка декодирования JSON-файла федеральных округов.") from error
         except IOError as error:
-            raise RegionDataLoadError("Error reading federal districts data file.") from error
+            raise RegionDataLoadError("Ошибка чтения файла данных федеральных округов.") from error
 
     async def get_region_list(self) -> list[RegionSchema]:
         """
@@ -112,7 +112,7 @@ class RegionService:
             ]
         except ValidationError as error:
             raise RegionServiceError(
-                error_details="An error occurred during data validation for the region list."
+                error_details="Ошибка валидации данных при получении списка регионов."
             ) from error
 
     async def get_region_in_federal_district(
@@ -143,15 +143,15 @@ class RegionService:
             ]
         except ValidationError as error:
             raise RegionServiceError(
-                error_details="An error occurred during data validation for regions in the federal district."
+                error_details="Ошибка валидации данных при получении регионов федерального округа."
             ) from error
 
     async def get_region_by_code(self, region_code_tv: str) -> dict:
         """
-        Возвращает данные региона по его коду "Работа России".
+        Возвращает данные региона по его коду.
 
         Args:
-            region_code_tv: Код региона, используемый на портале "Работа России".
+            region_code_tv: Код региона.
 
         Returns:
             Словарь с данными региона.
@@ -164,14 +164,14 @@ class RegionService:
             region_code_tv=region_code_tv
         )
         if not region_data_raw:
-            logger.error("Не удалось найти данные по региону с region_code_tv=%s", region_code_tv)
+            logger.error("❌ Регион не найден в базе данных. Код региона: %s", region_code_tv)
             raise RegionNotFoundError(region_code=region_code_tv)
-        
+
         try:
-            return RegionSchema.model_validate(region_data_raw).model_dump()
+            return RegionSchemaDb.model_validate(region_data_raw).model_dump()
         except ValidationError as error:
             raise RegionServiceError(
-                error_details="An error occurred during data validation for the specified region."
+                error_details="Ошибка валидации данных региона."
             ) from error
 
     async def get_federal_districts_list(self) -> list[FederalDistrictSchema]:
@@ -191,7 +191,7 @@ class RegionService:
             ]
         except ValidationError as error:
             raise RegionServiceError(
-                error_details="An error occurred during data validation for the federal district list."
+                error_details="Ошибка валидации данных при получении списка федеральных округов."
             ) from error
 
     async def _preload_region_data(self) -> None:
@@ -205,23 +205,18 @@ class RegionService:
         Raises:
             RegionDataLoadError: Если не удалось загрузить данные в базу данных.
         """
-        # Проверка наличия данных о регионах в БД
         if await self._is_region_data_present():
-            logger.info("Region data already present in the database.")
+            logger.info("✅ Данные регионов уже загружены в базу данных.")
             return
-        
-        # Если данных нет, попытка их загрузки из json файла
+
         region_data = self._read_file_data_regions()
-        
-        # Попытка записи данных в БД
         await self.region_repository.add_regions_data(region_data=region_data)
-        
-        # Повторная проверка наличия данных о регионах в БД
+
         if not await self._is_region_data_present():
             raise RegionDataLoadError(
-                message="Failed to load region data into the database."
+                message="Не удалось загрузить данные регионов в базу данных."
             )
-        logger.info("Region data successfully loaded into the database.")
+        logger.info("✅ Данные регионов успешно загружены в базу данных.")
 
     async def _preload_federal_districts_data(self) -> None:
         """
@@ -234,31 +229,24 @@ class RegionService:
         Raises:
             RegionDataLoadError: Если не удалось загрузить данные в базу данных.
         """
-        # Проверка наличия данных о федеральных округах в БД
         if await self._is_federal_districts_data_present():
-            logger.info("federal districts data already present in the database.")
+            logger.info("✅ Данные федеральных округов уже загружены в базу данных.")
             return
-        
-        # Если данных нет, попытка их загрузки из json файла
+
         federal_districts_data = self._read_file_data_federal_districts()
-        
-        # Попытка записи данных в БД
         await self.region_repository.add_federal_districts_data(
             federal_districts_data=federal_districts_data
         )
-        
-        # Повторная проверка наличия данных о федеральных округах в БД
+
         if not await self._is_federal_districts_data_present():
             raise RegionDataLoadError(
-                message="Failed to load federal districts data into the database."
+                message="Не удалось загрузить данные федеральных округов в базу данных."
             )
-        logger.info("Federal districts data successfully loaded into the database.")
+        logger.info("✅ Данные федеральных округов успешно загружены в базу данных.")
 
     async def initialize_region_data(self) -> None:
         """Параллельная проверка и предварительная загрузка данных о регионах и федеральных округах."""
-        logger.info(
-            ">>> Start parallel check and loading of data for regions and federal districts..."
-        )
+        logger.info("🚀 Запуск проверки и загрузки данных регионов и федеральных округов...")
 
         # Запускаем задачи последовательно, чтобы избежать состояния гонки в сессии БД
         await self._preload_region_data()

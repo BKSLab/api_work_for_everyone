@@ -25,11 +25,17 @@ class BaseVacancy(Base):
         doc='Место нахождение вакансии.',
         comment='Город или населенный пункт, где расположена вакансия'
     )
-    name: Mapped[Optional[str]] = mapped_column(
-        String(length=300),
+    vacancy_name: Mapped[Optional[str]] = mapped_column(
+        Text,
         nullable=False,
         doc='Название вакансии.',
         comment='Название или должность вакансии'
+    )
+    status: Mapped[Optional[str]] = mapped_column(
+        String(length=50),
+        nullable=True,
+        doc='Статус вакансии.',
+        comment='Статус вакансии (actual, archival, not_found)'
     )
     description: Mapped[Optional[str]] = mapped_column(
         Text,
@@ -56,7 +62,7 @@ class BaseVacancy(Base):
         comment='Название сайта-источника вакансии (например, "hh.ru", "trudvsem.ru")'
     )
     employer_name: Mapped[Optional[str]] = mapped_column(
-        String(length=300),
+        Text,
         nullable=False,
         doc='Наименование работодателя.',
         comment='Наименование компании-работодателя'
@@ -68,7 +74,7 @@ class BaseVacancy(Base):
         comment='Адрес расположения работодателя'
     )
     employer_phone: Mapped[Optional[str]] = mapped_column(
-        String(length=100),
+        Text,
         nullable=False,
         doc='Номер телефона работодателя.',
         comment='Контактный номер телефона работодателя'
@@ -79,29 +85,57 @@ class BaseVacancy(Base):
         doc='id работодателя на сайте источника.',
         comment='Идентификатор работодателя на сайте-источнике'
     )
-    experience_required: Mapped[Optional[str]] = mapped_column(
+    employer_email: Mapped[Optional[str]] = mapped_column(
         Text,
-        nullable=False,
-        doc='Требования к соискателю.',
-        comment='Требуемый опыт работы для соискателя'
+        nullable=True,
+        doc='Email работодателя.',
+        comment='Контактный email работодателя'
     )
-    category: Mapped[Optional[str]] = mapped_column(
-        String(length=100),
-        nullable=False,
-        doc='Категория вакансии.',
-        comment='Категория, к которой относится вакансия (например, "IT", "Продажи")'
+    contact_person: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc='Контактное лицо.',
+        comment='ФИО контактного лица работодателя'
     )
-    employment_type: Mapped[Optional[str]] = mapped_column(
-        String(length=200),
-        nullable=False,
+    employment: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
         doc='Тип занятости.',
         comment='Тип занятости (например, "Полная", "Частичная", "Проектная")'
     )
     schedule: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=False,
-        doc='Требование к образованию.',
+        doc='График работы.',
         comment='График работы (например, "Полный день", "Гибкий график", "Удаленная работа")'
     )
-
-
+    work_format: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc='Формат работы.',
+        comment='Формат выполнения работы (например, "Офис", "Разъездной", "Удалённо")'
+    )
+    experience_required: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=False,
+        doc='Требования к соискателю.',
+        comment='Требуемый опыт работы для соискателя'
+    )
+    requirements: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc='Требования к кандидату.',
+        comment='Конкретные требования к кандидату: навыки, знания, компетенции'
+    )
+    category: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=False,
+        doc='Категория вакансии.',
+        comment='Категория, к которой относится вакансия (например, "IT", "Продажи")'
+    )
+    social_protected: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc='Признак соц. защищённости.',
+        comment='Признак вакансии для социально защищённых категорий граждан'
+    )

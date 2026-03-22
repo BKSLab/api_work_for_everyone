@@ -1,0 +1,287 @@
+/* =====================================================
+   Административная панель — тёмная тема
+   Источник: DESIGN_GUIDE.md → «Sqladmin — применение стиля»
+   ===================================================== */
+
+:root {
+    --background:        #0A0A0A;
+    --surface:           #1A1A1A;
+    --surface-hover:     #252525;
+    --border:            #2D2D2D;
+    --foreground:        #F0F0F0;
+    --muted:             #999999;
+    --accent:            #F5B800;
+    --accent-hover:      #E0A800;
+    --accent-fg:         #0A0A0A;
+    --accent-bg:         rgba(245, 184, 0, 0.1);
+}
+
+/* ── Base ─────────────────────────────────────────── */
+body, html {
+    background-color: var(--background) !important;
+    color: var(--foreground) !important;
+    font-size: 14px;
+}
+
+a { color: var(--accent) !important; }
+a:hover { color: var(--accent-hover) !important; }
+
+hr { border-color: var(--border) !important; }
+.text-muted, .text-secondary { color: var(--muted) !important; }
+
+/* ── Navbar ───────────────────────────────────────── */
+.navbar, nav.navbar {
+    background-color: #1A1A1A !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+.navbar-brand, .navbar-brand:hover {
+    color: var(--accent) !important;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.navbar .nav-link { color: var(--foreground) !important; }
+.navbar .nav-link:hover { color: var(--accent) !important; }
+
+/* ── Sidebar ──────────────────────────────────────── */
+.sidebar, aside, [class*="sidebar"] {
+    background-color: #111111 !important;
+    border-right: 1px solid var(--border) !important;
+}
+.sidebar .nav-link,
+aside .nav-link {
+    color: var(--muted) !important;
+    border-radius: 4px;
+    transition: color 0.15s, background-color 0.15s;
+}
+.sidebar .nav-link:hover,
+aside .nav-link:hover {
+    color: var(--accent) !important;
+    background-color: var(--accent-bg) !important;
+}
+.sidebar .nav-link.active,
+aside .nav-link.active,
+.sidebar .active > .nav-link,
+aside .active > .nav-link {
+    color: var(--accent) !important;
+    background-color: var(--accent-bg) !important;
+    border-left: 2px solid var(--accent) !important;
+    font-weight: 600;
+}
+
+/* ── Cards ────────────────────────────────────────── */
+.card {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--foreground) !important;
+    border-radius: 8px !important;
+}
+.card-header {
+    background-color: #111111 !important;
+    border-bottom: 1px solid var(--border) !important;
+    font-weight: 600;
+}
+.card-footer {
+    background-color: #111111 !important;
+    border-top: 1px solid var(--border) !important;
+}
+
+/* ── Tables ───────────────────────────────────────── */
+.table {
+    color: var(--foreground) !important;
+    border-color: var(--border) !important;
+}
+.table thead th {
+    background-color: #111111 !important;
+    border-color: var(--border) !important;
+    color: var(--muted) !important;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-weight: 600;
+    padding: 10px 12px;
+}
+.table tbody tr {
+    background-color: var(--background) !important;
+    border-color: var(--border) !important;
+}
+.table tbody tr:nth-child(even) {
+    background-color: #111111 !important;
+}
+.table tbody tr:hover {
+    background-color: #1A1A1A !important;
+}
+.table td, .table th {
+    border-color: var(--border) !important;
+    vertical-align: middle;
+}
+
+/* ── Buttons ──────────────────────────────────────── */
+.btn-primary {
+    background-color: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent-fg) !important;
+    font-weight: 600;
+}
+.btn-primary:hover, .btn-primary:focus {
+    background-color: var(--accent-hover) !important;
+    border-color: var(--accent-hover) !important;
+    color: var(--accent-fg) !important;
+    box-shadow: 0 0 0 2px rgba(245, 184, 0, 0.25) !important;
+}
+.btn-secondary, .btn-outline-secondary {
+    background-color: transparent !important;
+    border: 1px solid rgba(245, 184, 0, 0.5) !important;
+    color: var(--accent) !important;
+    font-weight: 600;
+}
+.btn-secondary:hover, .btn-outline-secondary:hover {
+    background-color: var(--accent-bg) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+.btn-danger {
+    background-color: transparent !important;
+    border: 1px solid rgba(248, 113, 113, 0.5) !important;
+    color: #F87171 !important;
+}
+.btn-danger:hover {
+    background-color: rgba(248, 113, 113, 0.1) !important;
+    border-color: #F87171 !important;
+}
+.btn-success {
+    background-color: transparent !important;
+    border: 1px solid rgba(74, 222, 128, 0.5) !important;
+    color: #4ADE80 !important;
+}
+.btn:disabled, .btn.disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+.btn:focus-visible {
+    outline: 2px solid var(--accent) !important;
+    outline-offset: 2px !important;
+}
+
+/* ── Forms ────────────────────────────────────────── */
+.form-control, .form-select {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--foreground) !important;
+    border-radius: 6px !important;
+}
+.form-control::placeholder { color: var(--muted) !important; }
+.form-control:focus, .form-select:focus {
+    background-color: var(--surface) !important;
+    border-color: var(--accent) !important;
+    color: var(--foreground) !important;
+    box-shadow: 0 0 0 2px rgba(245, 184, 0, 0.25) !important;
+    outline: none !important;
+}
+.form-label {
+    color: var(--muted) !important;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.input-group-text {
+    background-color: #111111 !important;
+    border-color: var(--border) !important;
+    color: var(--muted) !important;
+}
+
+/* ── Alerts ───────────────────────────────────────── */
+.alert-success {
+    background-color: rgba(74, 222, 128, 0.1) !important;
+    border-color: rgba(74, 222, 128, 0.3) !important;
+    color: #4ADE80 !important;
+}
+.alert-danger {
+    background-color: rgba(248, 113, 113, 0.1) !important;
+    border-color: rgba(248, 113, 113, 0.3) !important;
+    color: #F87171 !important;
+}
+.alert-info, .alert-primary {
+    background-color: var(--accent-bg) !important;
+    border-color: rgba(245, 184, 0, 0.3) !important;
+    color: var(--accent) !important;
+}
+.alert-warning {
+    background-color: rgba(245, 184, 0, 0.08) !important;
+    border-color: rgba(245, 184, 0, 0.25) !important;
+    color: var(--accent) !important;
+}
+
+/* ── Pagination ───────────────────────────────────── */
+.page-link {
+    background-color: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--foreground) !important;
+}
+.page-link:hover {
+    background-color: var(--surface-hover) !important;
+    border-color: var(--border) !important;
+    color: var(--accent) !important;
+}
+.page-item.active .page-link {
+    background-color: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent-fg) !important;
+    font-weight: 600;
+}
+.page-item.disabled .page-link {
+    background-color: var(--surface) !important;
+    color: var(--muted) !important;
+    opacity: 0.5;
+}
+
+/* ── Dropdowns ────────────────────────────────────── */
+.dropdown-menu {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+}
+.dropdown-item {
+    color: var(--foreground) !important;
+}
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: var(--surface-hover) !important;
+    color: var(--accent) !important;
+}
+.dropdown-divider { border-color: var(--border) !important; }
+
+/* ── Modals ───────────────────────────────────────── */
+.modal-content {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--foreground) !important;
+}
+.modal-header {
+    background-color: #111111 !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+.modal-footer {
+    background-color: #111111 !important;
+    border-top: 1px solid var(--border) !important;
+}
+.modal-title { color: var(--foreground) !important; font-weight: 600; }
+.btn-close { filter: invert(1) opacity(0.6) !important; }
+.btn-close:hover { filter: invert(1) opacity(1) !important; }
+
+/* ── Misc ─────────────────────────────────────────── */
+.badge.bg-primary, .badge.bg-info {
+    background-color: var(--accent) !important;
+    color: var(--accent-fg) !important;
+}
+.badge.bg-success { background-color: rgba(74, 222, 128, 0.2) !important; color: #4ADE80 !important; }
+.badge.bg-danger  { background-color: rgba(248, 113, 113, 0.2) !important; color: #F87171 !important; }
+
+select option {
+    background-color: var(--surface) !important;
+    color: var(--foreground) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }

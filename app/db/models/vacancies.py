@@ -11,7 +11,8 @@ class Vacancies(BaseVacancy):
     __tablename__ = 'vacancies'
 
     __table_args__ = (
-        UniqueConstraint('vacancy_id', name='uq_vacancies_vacancy_id'),
+        UniqueConstraint(
+            'vacancy_id', 'location', name='unique_vacancies_vacancy_id__location'),
     )
 
     def __repr__(self) -> str:

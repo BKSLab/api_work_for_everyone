@@ -14,15 +14,15 @@ class VacanciesNotFoundError(Exception):
 
     def __str__(self):
         return (
-            f"VacanciesNotFoundError: No vacancies found for region_code='{self.region_code}', "
-            f"location='{self.location}' in source='{self.source}'."
+            f"Вакансии не найдены. Код региона: '{self.region_code}', "
+            f"населённый пункт: '{self.location}', источник: '{self.source}'."
         )
-        
+
     @property
     def detail(self) -> str:
         return (
-            f"No vacancies found in the specified area using source '{self.source}'. "
-            f"Region: {self.region_code}, Location: {self.location}."
+            f"Вакансии не найдены в указанном районе (источник: '{self.source}'). "
+            f"Регион: {self.region_code}, населённый пункт: {self.location}."
         )
 
 
@@ -30,25 +30,22 @@ class VacancyNotFoundError(Exception):
     """Вакансия не найдена в БД."""
     status_code = status.HTTP_404_NOT_FOUND
 
-    def __init__(self, vacancy_id: str, error_details: str):
+    def __init__(self, vacancy_id: str, error_details: str = ""):
         self.vacancy_id = vacancy_id
         self.error_details = error_details
         super().__init__(self.vacancy_id, self.error_details)
 
     def __str__(self) -> str:
-        return f"VacancyNotFoundError: No vacancy found for vacancy_id='{self.vacancy_id}'. Details: {self.error_details}"
+        return f"Вакансия не найдена. ID вакансии: '{self.vacancy_id}'. Подробности: {self.error_details}"
 
     @property
     def detail(self) -> str:
-        return (
-            f"No vacancy found for the provided ID '{self.vacancy_id}'. Please check the ID and try again. "
-            f"Details: {self.error_details}"
-        )
+        return f"Вакансия с ID '{self.vacancy_id}' не найдена. Проверьте корректность ID."
 
 
 class VacancyAlreadyInFavoritesError(Exception):
     """Исключение для дублирования вакансии в избранном."""
-    status_code = status_code = status.HTTP_409_CONFLICT
+    status_code = status.HTTP_409_CONFLICT
 
     def __init__(self, favorite_data: dict):
         self.favorite_data = favorite_data
@@ -56,10 +53,10 @@ class VacancyAlreadyInFavoritesError(Exception):
 
     def __str__(self) -> str:
         return (
-            "An attempt to add a vacancy that the user has previously "
-            f"added to favorites. favorite_data:={pformat(self.favorite_data)}"
+            "Попытка добавить вакансию, которая уже добавлена в избранное. "
+            f"Данные: {pformat(self.favorite_data)}"
         )
 
     @property
     def detail(self) -> str:
-        return "This vacancy is already in favorites for user."
+        return "Данная вакансия уже добавлена в избранное."

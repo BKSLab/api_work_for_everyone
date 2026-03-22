@@ -16,9 +16,50 @@ logger = logging.getLogger(__name__)
     status_code=status.HTTP_200_OK,
     summary="Получить список всех федеральных округов",
     description="Возвращает полный список всех федеральных округов.",
+    operation_id="getFederalDistrictsList",
+    response_description="Полный список федеральных округов",
     responses={
-        200: {"description": "Данные о федеральных округов успешно получены."},
-        500: {"description": "Внутренняя ошибка сервера."},
+        200: {
+            "description": "Данные о федеральных округах успешно получены.",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "name": "Приволжский федеральный округ",
+                            "code": "33",
+                        },
+                        {
+                            "name": "Центральный федеральный округ",
+                            "code": "30",
+                        },
+                    ]
+                }
+            },
+        },
+        401: {
+            "description": "API-ключ отсутствует или невалиден.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid API key."}
+                }
+            },
+        },
+        403: {
+            "description": "API-ключ просрочен или деактивирован.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "API key has expired."}
+                }
+            },
+        },
+        500: {
+            "description": "Внутренняя ошибка сервера.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "A database error occurred while processing region data."}
+                }
+            },
+        },
     },
     response_model=list[FederalDistrictSchema],
 )
@@ -31,15 +72,15 @@ async def list_federal_districts(region_service: RegionServiceDep) -> list[Feder
     Returns:
         Полный список всех федеральных округов.
     """
-    logger.info("Начало обработки /federal-districts/list.")
+    logger.info("🚀 Запрос GET /federal-districts/list.")
     try:
         region_data = await region_service.get_federal_districts_list()
-        logger.info("Успешное завершение /federal-districts/list.")
+        logger.info("✅ Запрос GET /federal-districts/list выполнен.")
 
         return region_data
     except (RegionRepositoryError, RegionServiceError) as error:
         logger.exception(
-            "Ошибка при получении списка федеральных округов: %s",
+            "❌ Ошибка при получении списка федеральных округов. Детали: %s",
             error,
         )
         raise HTTPException(status_code=error.status_code, detail=error.detail)

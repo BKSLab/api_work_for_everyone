@@ -10,11 +10,11 @@ class RegionRepositoryError(Exception):
         super().__init__(self.error_details)
 
     def __str__(self) -> str:
-        return f"An error occurred in the RegionRepository. Details: {self.error_details}"
+        return f"Ошибка в RegionRepository. Подробности: {self.error_details}"
 
     @property
     def detail(self) -> str:
-        return f"A database error occurred while processing region data. Details: {self.error_details}"
+        return f"Ошибка базы данных при обработке данных регионов. Подробности: {self.error_details}"
 
 
 class VacanciesRepositoryError(Exception):
@@ -26,11 +26,11 @@ class VacanciesRepositoryError(Exception):
         super().__init__(self.error_details)
 
     def __str__(self) -> str:
-        return f"An error occurred in the VacanciesRepository. Details: {self.error_details}"
+        return f"Ошибка в VacanciesRepository. Подробности: {self.error_details}"
 
     @property
     def detail(self) -> str:
-        return f"A database error occurred while processing vacancies data. Details: {self.error_details}"
+        return f"Ошибка базы данных при обработке данных вакансий. Подробности: {self.error_details}"
 
 
 class FavoritesRepositoryError(Exception):
@@ -42,15 +42,15 @@ class FavoritesRepositoryError(Exception):
         super().__init__(self.error_details)
 
     def __str__(self) -> str:
-        return f"An error occurred in the FavoritesRepository. Details: {self.error_details}"
+        return f"Ошибка в FavoritesRepository. Подробности: {self.error_details}"
 
     @property
     def detail(self) -> str:
-        return f"A database error occurred while processing favorites data. Details: {self.error_details}"
+        return f"Ошибка базы данных при обработке данных избранного. Подробности: {self.error_details}"
 
 
-class UsersRepositoryError(Exception):
-    """Базовое исключение для ошибок репозитория Users."""
+class AssistantSessionRepositoryError(Exception):
+    """Исключение для класса репозитория для работы с сессиями AI-ассистента."""
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def __init__(self, error_details):
@@ -58,15 +58,15 @@ class UsersRepositoryError(Exception):
         super().__init__(self.error_details)
 
     def __str__(self) -> str:
-        return f"An error occurred in the UsersRepository. Details: {self.error_details}"
+        return f"Ошибка в AssistantSessionRepository. Подробности: {self.error_details}"
 
     @property
     def detail(self) -> str:
-        return f"A database error occurred while processing user data. Details: {self.error_details}"
+        return f"Ошибка базы данных при сохранении сессии AI-ассистента. Подробности: {self.error_details}"
 
 
-class BlocklistRepositoryError(Exception):
-    """Базовое исключение для ошибок репозитория BlocklistRepository."""
+class ApiKeyRepositoryError(Exception):
+    """Исключение для класса репозитория для работы с API-ключами."""
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def __init__(self, error_details):
@@ -74,8 +74,8 @@ class BlocklistRepositoryError(Exception):
         super().__init__(self.error_details)
 
     def __str__(self) -> str:
-        return f"An error occurred in the BlocklistRepository. Details: {self.error_details}"
+        return f"Ошибка в ApiKeyRepository. Подробности: {self.error_details}"
 
     @property
     def detail(self) -> str:
-        return f"A database error occurred while processing blocklist data. Details: {self.error_details}"
+        return f"Ошибка базы данных при обработке данных API-ключей. Подробности: {self.error_details}"

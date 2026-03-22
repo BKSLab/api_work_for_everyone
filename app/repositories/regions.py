@@ -26,7 +26,7 @@ class RegionRepository:
             return regions
         except (SQLAlchemyError, Exception) as error:
             raise RegionRepositoryError(
-                error_details="Error retrieving all regions."
+                error_details="Ошибка при получении списка регионов."
             ) from error
 
     async def get_federal_districts_all_data(self) -> list[Region]:
@@ -38,7 +38,7 @@ class RegionRepository:
             return regions
         except (SQLAlchemyError, Exception) as error:
             raise RegionRepositoryError(
-                error_details="Error retrieving all federal_districts."
+                error_details="Ошибка при получении списка федеральных округов."
             ) from error
 
     async def get_regions_all_in_fed_dist(self, fd_code: str) -> list[Region]:
@@ -53,8 +53,8 @@ class RegionRepository:
         except (SQLAlchemyError, Exception) as error:
             raise RegionRepositoryError(
                 error_details=(
-                    f"Error retrieving regions by federal district. "
-                    f"FD_Code: {fd_code}."
+                    f"Ошибка при получении регионов федерального округа. "
+                    f"Код округа: {fd_code}."
                 )
             ) from error
 
@@ -69,7 +69,7 @@ class RegionRepository:
             return regions
         except (SQLAlchemyError, Exception) as error:
             raise RegionRepositoryError(
-                error_details=f"Error retrieving region data. RegionCodeTV: {region_code_tv}."
+                error_details=f"Ошибка при получении данных региона. Код региона: {region_code_tv}."
             ) from error
 
     async def add_regions_data(self, region_data: list[dict]) -> None:
@@ -78,11 +78,11 @@ class RegionRepository:
             data = insert(table=Region).values(region_data)
             await self.db_session.execute(statement=data)
             await self.db_session.commit()
-            logger.info("Сохранено %d регионов.", len(region_data))
+            logger.info("💾 Сохранено %d регионов.", len(region_data))
         except (SQLAlchemyError, Exception) as error:
             await self.db_session.rollback()
             raise RegionRepositoryError(
-                error_details="Error adding new regions to the database."
+                error_details="Ошибка при сохранении регионов в базу данных."
             ) from error
 
     async def add_federal_districts_data(self, federal_districts_data: list[dict]) -> None:
@@ -91,9 +91,9 @@ class RegionRepository:
             data = insert(table=FederalDistricts).values(federal_districts_data)
             await self.db_session.execute(statement=data)
             await self.db_session.commit()
-            logger.info("Сохранено %d федеральных округов.", len(federal_districts_data))
+            logger.info("💾 Сохранено %d федеральных округов.", len(federal_districts_data))
         except (SQLAlchemyError, Exception) as error:
             await self.db_session.rollback()
             raise RegionRepositoryError(
-                error_details="Error adding new federal districts to the database."
+                error_details="Ошибка при сохранении федеральных округов в базу данных."
             ) from error

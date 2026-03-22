@@ -1,6 +1,8 @@
 import asyncio
+import functools
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 from pprint import pformat
 
 from pydantic import ValidationError
@@ -17,16 +19,19 @@ from exceptions.vacancies import (
     VacanciesNotFoundError,
     VacancyNotFoundError,
 )
+from repositories.assistant_session import AssistantSessionRepository
 from repositories.favorites import FavoritesRepository
+from repositories.search_event import SearchEventRepository
 from repositories.vacancies import VacanciesRepository
 from schemas.vacancies import (
     FavoriteVacanciesListSchema,
     VacanciesListSchema,
-    VacancyDetailsOutSchema,
-    VacancyOutSchema,
+    VacancySchema,
 )
+from schemas.vacancy_assistant import QuestionnaireResponseSchema
 from services.parsing_vacancies import VacanciesParsingService
 from services.regions import RegionService
+from services.vacancy_assistant import VacancyAiAssistant
 
 logger = logging.getLogger(__name__)
 
@@ -36,22 +41,29 @@ class VacanciesService:
     MAX_COUNT_PARTS_IN_LOCATION = 3
     FLAG_VACANCY_NOT_FOUND = "not_found"
     SEMAPHORE_LIMIT = 5
+    FAVORITES_TTL_HOURS = 24
 
     def __init__(
         self,
         region_service: RegionService,
         vacancies_repository: VacanciesRepository,
         favorites_repository: FavoritesRepository,
+        assistant_session_repository: AssistantSessionRepository,
+        search_event_repository: SearchEventRepository,
         hh_client_api: HHClient,
         tv_client_api: TVClient,
         vacancies_parser: VacanciesParsingService,
+        vacancy_ai_assistant: VacancyAiAssistant,
     ):
         self.region_service = region_service
         self.vacancies_repository = vacancies_repository
         self.favorites_repository = favorites_repository
+        self.assistant_session_repository = assistant_session_repository
+        self.search_event_repository = search_event_repository
         self.hh_client_api = hh_client_api
         self.tv_client_api = tv_client_api
         self.vacancies_parser = vacancies_parser
+        self.vacancy_ai_assistant = vacancy_ai_assistant
         self.semaphore = asyncio.Semaphore(self.SEMAPHORE_LIMIT)
 
     async def validation_and_get_region_data(self, location: str, region_code: str) -> dict:
@@ -71,7 +83,7 @@ class VacanciesService:
             RegionNotFoundError: Если регион по `region_code` не найден.
         """
         logger.info(
-            "Данные, полученные на валидацию: region_code - %s; location - %s",
+            "🔍 Данные для валидации. Код региона: %s, населённый пункт: %s",
             region_code, location
         )
         validated_data = {
@@ -82,7 +94,7 @@ class VacanciesService:
                 region_code_tv=region_code
             )
         }
-        logger.info("Данные после валидации: %s", pformat(validated_data))
+        logger.info("✅ Данные после валидации: %s", pformat(validated_data))
         return validated_data
 
     async def get_vacancies_info(self, location: str, region_data: dict) -> dict:
@@ -104,7 +116,7 @@ class VacanciesService:
             VacanciesServiceError: Если не удалось получить данные ни из одного источника.
         """
         logger.info(
-            "Данные для поиска вакансий: region_data - %s; location - %s",
+            "🔍 Данные для поиска вакансий. Регион: %s, населённый пункт: %s",
             pformat(region_data), location
         )
 
@@ -118,9 +130,9 @@ class VacanciesService:
         all_vacancies_count = api_vacancies_response.get("all_vacancies_count")
 
         if error_request_hh and error_request_tv:
-            logger.error("Не удалось получить или обработать данные вакансий со всех источников")
+            logger.error("❌ Не удалось получить данные вакансий ни из одного источника")
             raise VacanciesServiceError(
-                error_details="Unable to retrieve or process vacancy data from all sources."
+                error_details="Не удалось получить данные вакансий ни из одного источника."
             )
 
         await self._save_vacancies_data(
@@ -129,9 +141,19 @@ class VacanciesService:
             vacancies=api_vacancies_response.get("vacancies"),
         )
 
+        await self.search_event_repository.save_event({
+            "location": location,
+            "region_name": region_name,
+            "region_code": region_data.get("code_tv", ""),
+            "count_hh": api_vacancies_response.get("vacancies_count_hh", 0),
+            "count_tv": api_vacancies_response.get("vacancies_count_tv", 0),
+            "total_count": all_vacancies_count,
+            "error_hh": bool(error_request_hh),
+            "error_tv": bool(error_request_tv),
+        })
+
         logger.info(
-            "Поиск и сохранение вакансий для '%s' в регионе '%s' завершен. "
-            "Всего найдено: %d вакансий.",
+            "✅ Поиск вакансий завершён. Населённый пункт: '%s', регион: '%s'. Найдено: %d вакансий.",
             location, region_name, all_vacancies_count
         )
 
@@ -140,15 +162,24 @@ class VacanciesService:
         return api_vacancies_response
 
     async def get_vacancies_by_location(
-        self, location: str, page: int, page_size: int
+        self,
+        location: str,
+        page: int,
+        page_size: int,
+        user_id: str | None = None,
+        keyword: str | None = None,
+        source: str | None = None,
     ):
         """
         Возвращает пагинированный список вакансий для указанной локации.
 
         Args:
             location: Наименование населенного пункта.
+            user_id: Идентификатор пользователя во внешней системе, опциональное поле.
             page: Номер страницы.
             page_size: Количество элементов на странице.
+            keyword: Ключевое слово для поиска в названии и описании вакансии.
+            source: Фильтр по источнику ('hh.ru' или 'trudvsem.ru').
 
         Returns:
             Объект `VacanciesListSchema` с пагинированным списком вакансий.
@@ -157,32 +188,41 @@ class VacanciesService:
             VacanciesServiceError: В случае ошибки валидации данных.
         """
         logger.info(
-            "Получение списка вакансий по локации: %s, "
-            "страница: %s, размер страницы: %s",
-            location, page, page_size
+            "📋 Получение списка вакансий. Населённый пункт: %s, страница: %s, размер: %s, ключевое слово: %s, источник: %s",
+            location, page, page_size, keyword, source
         )
 
         total = await self.vacancies_repository.get_count_vacancies(
-            location=location
+            location=location, keyword=keyword, source=source
         )
         if total == 0:
             items = []
         else:
             vacancies = await self.vacancies_repository.get_vacancies(
-                location=location, page=page, page_size=page_size
+                location=location, page=page, page_size=page_size,
+                keyword=keyword, source=source,
             )
 
             try:
                 items = [
-                        VacancyOutSchema.model_validate(vacancy) for vacancy in vacancies
-                    ]
+                    VacancySchema.model_validate(vacancy) for vacancy in vacancies
+                ]
+                # Если пользователь авторизован — проверяем избранное одним запросом
+                if user_id:
+                    vacancy_ids = [item.vacancy_id for item in items]
+                    favorite_ids = await self.favorites_repository.get_favorite_vacancy_ids(
+                        user_id, vacancy_ids
+                    )
+                    for item in items:
+                        item.is_favorite = item.vacancy_id in favorite_ids
+
             except ValidationError as error:
                 raise VacanciesServiceError(
-                    error_details="An error occurred during data validation for the vacancy list."
+                    error_details="Ошибка валидации данных при получении списка вакансий."
                 ) from error
 
         logger.info(
-            "Для локации: %s, страницы %s с размером страницы %s, найдено %s вакансий.",
+            "✅ Вакансии получены. Населённый пункт: %s, страница: %s, размер: %s, найдено: %s.",
             location, page, page_size, len(items)
         )
 
@@ -193,87 +233,92 @@ class VacanciesService:
             items=items
         )
 
-    async def get_vacancy_details(self, vacancy_id: str) -> dict:
+    async def get_vacancy_details(self, vacancy_id: str, user_id: str | None = None) -> VacancySchema:
         """
-        Возвращает детальную информацию по одной вакансии.
+        Возвращает детальную информацию по вакансии с учётом избранного пользователя.
 
-        Получает данные из БД, затем актуализирует их, обращаясь к внешнему API
-        соответствующего источника (`hh.ru` или `Работа России`).
+        Для вакансий hh.ru всегда запрашивает актуальные данные из API,
+        так как в БД хранится только краткое описание из листинга.
+        Для trudvsem.ru данные берутся из БД (там уже полные данные).
 
         Args:
             vacancy_id: Уникальный идентификатор вакансии.
+            user_id: Идентификатор пользователя для проверки избранного (опционально).
 
         Returns:
-            Объект `VacancyDetailsOutSchema` с детальной информацией о вакансии.
+            Объект `VacancySchema` с детальной информацией о вакансии.
 
         Raises:
-            VacanciesServiceError: В случае ошибки валидации или при неизвестном источнике.
-            VacancyNotFoundError: Если вакансия не найдена в БД или API.
+            VacancyNotFoundError: Если вакансия не найдена в БД или во внешнем источнике.
+            VacanciesServiceError: В случае ошибки валидации данных.
         """
-        logger.info(
-            "Обработка запроса на получение подробной информации по вакансии с vacancy_id: %s", vacancy_id
-        )
-
         vacancy = await self._get_vacancy_by_id(vacancy_id=vacancy_id)
 
-        if vacancy.vacancy_source == 'hh.ru':
-            vacancy_details_raw = await self._get_vacancy_details_hh_api(
-                vacancy_id=vacancy.vacancy_id
-            )
-        elif vacancy.vacancy_source == 'Работа России':
-            vacancy_details_raw = await self._get_vacancy_details_tv_api(
-                vacancy_id=vacancy.vacancy_id,
-                employer_code=vacancy.employer_code
-            )
-        else:
-            logger.info(
-                f'Неизвестный источник ({vacancy.vacancy_source}) для вакансии с vacancy_id={vacancy_id}.'
-            )
-            raise VacanciesServiceError(
-                error_details=f"Unknown source ('{vacancy.vacancy_source}') for the vacancy."
-            )
-        
-        logger.info(
-            "Детальная информация по вакансии с vacancy_id=%s из источника - %s:\n%s",
-            vacancy_id, vacancy.vacancy_source, pformat(vacancy_details_raw)
-        )
-
         try:
-            vacancy_details = VacancyDetailsOutSchema.model_validate(vacancy_details_raw)
-            return vacancy_details
-        except ValidationError as error:
-            raise VacanciesServiceError(
-                error_details="An error occurred during data validation for the vacancy details."
-            ) from error
+            detailed = await self._fetch_vacancy_details_from_api(
+                vacancy_id=vacancy_id,
+                vacancy_source=vacancy.vacancy_source,
+                employer_code=vacancy.employer_code,
+            )
+            vacancy = VacancySchema(**detailed)
+        except (VacancyNotFoundError, HHAPIRequestError, TVAPIRequestError, VacanciesServiceError) as error:
+            logger.warning(
+                "⚠️ Не удалось получить детали для ID %s: %s. Возвращаем данные из БД.",
+                vacancy_id, error
+            )
 
-    async def add_vacancy_to_favorites(self, vacancy_id: str, user_id: int) -> None:
+        if user_id:
+            favorite_ids = await self.favorites_repository.get_favorite_vacancy_ids(
+                user_id, [vacancy_id]
+            )
+            vacancy.is_favorite = vacancy_id in favorite_ids
+
+        return vacancy
+
+    async def add_vacancy_to_favorites(self, vacancy_id: str, user_id: str) -> None:
         """
         Добавляет вакансию в список избранного для пользователя.
+
+        Для вакансий hh.ru дополнительно запрашивает детальную информацию
+        из API, чтобы сохранить полное описание вместо короткого сниппета.
 
         Args:
             vacancy_id: Идентификатор вакансии для добавления.
             user_id: Идентификатор пользователя.
         """
         logger.info(
-            "Обработка запроса на добавление вакансии с vacancy_id: %s, "
-            "от пользователя с user_id: %s",
+            "➕ Запрос на добавление вакансии в избранное. ID вакансии: %s, ID пользователя: %s",
             vacancy_id, user_id
         )
 
         vacancy = await self._get_vacancy_by_id(vacancy_id=vacancy_id)
 
         try:
-            vacancy_dict = VacancyDetailsOutSchema.model_dump(vacancy)
+            vacancy_dict = vacancy.model_dump()
+            vacancy_dict.pop("is_favorite", None)
         except ValidationError as error:
             raise VacanciesServiceError(
-                error_details="An error occurred during data validation for the vacancy details."
+                error_details="Ошибка валидации данных при получении информации о вакансии."
             ) from error
-    
+
+        try:
+            detailed = await self._fetch_vacancy_details_from_api(
+                vacancy_id=vacancy_id,
+                vacancy_source=vacancy.vacancy_source,
+                employer_code=vacancy.employer_code,
+            )
+            vacancy_dict.update(detailed)
+        except (VacancyNotFoundError, HHAPIRequestError, TVAPIRequestError, VacanciesServiceError) as error:
+            logger.warning(
+                "⚠️ Не удалось получить детальную информацию для ID %s: %s. Сохраняем данные из БД.",
+                vacancy_id, error
+            )
+
         await self.favorites_repository.add_vacancy(
             favorite_data={"user_id": user_id, **vacancy_dict}
         )
     
-    async def delete_vacancy_from_favorites(self, vacancy_id: str, user_id: int) -> None:
+    async def delete_vacancy_from_favorites(self, vacancy_id: str, user_id: str) -> None:
         """
         Удаляет вакансию из списка избранного пользователя.
 
@@ -285,8 +330,7 @@ class VacanciesService:
             VacancyNotFoundError: Если вакансия не найдена в избранном у пользователя.
         """
         logger.info(
-            "Обработка запроса на удаление вакансии с vacancy_id: %s, "
-            "от пользователя с user_id: %s",
+            "🗑️ Запрос на удаление вакансии из избранного. ID вакансии: %s, ID пользователя: %s",
             vacancy_id, user_id
         )
         delete_result = await self.favorites_repository.delete_vacancy(
@@ -295,10 +339,10 @@ class VacanciesService:
         if not delete_result:
             raise VacancyNotFoundError(
                 vacancy_id=vacancy_id,
-                error_details="The specified vacancy was not found in the user's favorites."
+                error_details="Указанная вакансия не найдена в избранном пользователя."
             )
 
-    async def get_user_favorites(self, user_id: int, page: int, page_size: int) -> FavoriteVacanciesListSchema:
+    async def get_user_favorites(self, user_id: str, page: int, page_size: int) -> FavoriteVacanciesListSchema:
         """
         Возвращает пагинированный список избранных вакансий пользователя.
 
@@ -318,7 +362,7 @@ class VacanciesService:
             VacanciesServiceError: В случае ошибки валидации данных.
         """
         logger.info(
-            "Получение избранных вакансий для пользователя id=%s, страница: %s, размер страницы: %s",
+            "📋 Получение избранных вакансий. ID пользователя: %s, страница: %s, размер: %s",
             user_id, page, page_size
         )
 
@@ -330,25 +374,24 @@ class VacanciesService:
                 total=0, page=page, page_size=page_size, items=[]
             )
 
-        logger.info("Для пользователя user_id=%s найдено %s вакансий в избранном", user_id, total)
+        logger.info("✅ Найдено вакансий в избранном у пользователя %s: %s.", user_id, total)
         vacancies_raw = await self.favorites_repository.get_favorites_vacancies(
             user_id=user_id,
             page=page,
             page_size=page_size
         )
 
-        logger.info(f"pformat(vacancies_raw) {pformat(vacancies_raw)}")
         compiled_vacancies = await self._compile_enriched_favorite_vacancies(
             vacancies_raw=vacancies_raw
         )
 
         try:
             items = [
-                VacancyDetailsOutSchema.model_validate(vacancy) for vacancy in compiled_vacancies
+                VacancySchema.model_validate(vacancy) for vacancy in compiled_vacancies
             ]
         except ValidationError as error:
             raise VacanciesServiceError(
-                error_details="An error occurred during data validation for the favorite vacancies list."
+                error_details="Ошибка валидации данных при получении списка избранных вакансий."
             ) from error
 
         return FavoriteVacanciesListSchema(
@@ -357,6 +400,255 @@ class VacanciesService:
             page_size=page_size,
             items=items
         )
+
+    async def get_vacancy_by_id_from_favorites(self, vacancy_id: str, user_id: str | None) -> VacancySchema:
+        """
+        Возвращает актуальную детальную информацию по вакансии из избранного.
+
+        Args:
+            vacancy_id: Уникальный идентификатор вакансии.
+            user_id: Идентификатор пользователя. Если указан — ищет вакансию только
+                     среди избранного этого пользователя. Если None — среди всех записей.
+
+        Returns:
+            Объект `VacancySchema` с детальной информацией о вакансии.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена в избранном или во внешнем источнике.
+            VacanciesServiceError: При ошибке валидации или неизвестном источнике.
+        """
+        return await self._get_vacancy_by_id_from_favorites(
+            vacancy_id=vacancy_id, user_id=user_id
+        )
+
+    # Блок методов AI-ассистента
+    async def gen_cover_letter_by_vacancy(self, vacancy_id: str, user_id: str | None = None) -> str:
+        """Генерирует шаблон сопроводительного письма по данным вакансии.
+
+        Args:
+            vacancy_id: Уникальный идентификатор вакансии.
+            user_id: Идентификатор пользователя для поиска вакансии в избранном.
+
+        Returns:
+            HTML-строка с советом и шаблоном сопроводительного письма.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена.
+            VacanciesServiceError: При ошибке валидации данных.
+        """
+        logger.info("🤖 Генерация шаблона письма. ID вакансии: %s.", vacancy_id)
+        vacancy = await self._get_vacancy_by_id_from_favorites(vacancy_id=vacancy_id, user_id=user_id)
+        vacancy_dict = vacancy.model_dump()
+        cover_letter = await self.vacancy_ai_assistant.gen_cover_letter_by_vacancy(
+            vacancy=vacancy_dict
+        )
+        await self.assistant_session_repository.save_session(
+            session_type="cover_letter_by_vacancy",
+            vacancy_id=vacancy_id,
+            vacancy_name=vacancy_dict.get("vacancy_name", ""),
+            employer_name=vacancy_dict.get("employer_name"),
+            employer_location=vacancy_dict.get("employer_location"),
+            employment=vacancy_dict.get("employment"),
+            salary=vacancy_dict.get("salary"),
+            description=vacancy_dict.get("description"),
+            result=cover_letter,
+            llm_model=self.vacancy_ai_assistant.llm_client.model,
+        )
+        logger.info("✅ Шаблон письма сгенерирован. ID вакансии: %s.", vacancy_id)
+        return cover_letter
+
+    async def gen_resume_tips_by_vacancy(self, vacancy_id: str, user_id: str | None = None) -> str:
+        """Генерирует рекомендации по составлению резюме под конкретную вакансию.
+
+        Args:
+            vacancy_id: Уникальный идентификатор вакансии.
+            user_id: Идентификатор пользователя для поиска вакансии в избранном.
+
+        Returns:
+            HTML-строка с рекомендациями по резюме.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена.
+            VacanciesServiceError: При ошибке валидации данных.
+        """
+        logger.info("🤖 Генерация рекомендаций по резюме. ID вакансии: %s.", vacancy_id)
+        vacancy = await self._get_vacancy_by_id_from_favorites(vacancy_id=vacancy_id, user_id=user_id)
+        vacancy_dict = vacancy.model_dump()
+        resume_tips = await self.vacancy_ai_assistant.gen_resume_tips_by_vacancy(
+            vacancy=vacancy_dict
+        )
+        await self.assistant_session_repository.save_session(
+            session_type="resume_tips_by_vacancy",
+            vacancy_id=vacancy_id,
+            vacancy_name=vacancy_dict.get("vacancy_name", ""),
+            employer_name=vacancy_dict.get("employer_name"),
+            employer_location=vacancy_dict.get("employer_location"),
+            employment=vacancy_dict.get("employment"),
+            salary=vacancy_dict.get("salary"),
+            description=vacancy_dict.get("description"),
+            result=resume_tips,
+            llm_model=self.vacancy_ai_assistant.llm_client.model,
+        )
+        logger.info("✅ Рекомендации по резюме сгенерированы. ID вакансии: %s.", vacancy_id)
+        return resume_tips
+
+    async def gen_letter_questionnaire(self, vacancy_id: str, user_id: str | None = None) -> QuestionnaireResponseSchema:
+        """Генерирует анкету для составления персонализированного сопроводительного письма.
+
+        Args:
+            vacancy_id: Уникальный идентификатор вакансии.
+            user_id: Идентификатор пользователя для поиска вакансии в избранном.
+
+        Returns:
+            Объект QuestionnaireResponseSchema с вопросами анкеты.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена.
+            VacanciesServiceError: При ошибке валидации данных.
+        """
+        logger.info("🤖 Генерация анкеты (письмо). ID вакансии: %s.", vacancy_id)
+        vacancy = await self._get_vacancy_by_id_from_favorites(vacancy_id=vacancy_id, user_id=user_id)
+        vacancy_dict = vacancy.model_dump()
+        questionnaire = await self.vacancy_ai_assistant.gen_letter_questionnaire(
+            vacancy=vacancy_dict,
+            schema=QuestionnaireResponseSchema,
+        )
+        await self.assistant_session_repository.save_session(
+            session_type="letter_questionnaire",
+            vacancy_id=vacancy_id,
+            vacancy_name=vacancy_dict.get("vacancy_name", ""),
+            employer_name=vacancy_dict.get("employer_name"),
+            employer_location=vacancy_dict.get("employer_location"),
+            employment=vacancy_dict.get("employment"),
+            salary=vacancy_dict.get("salary"),
+            description=vacancy_dict.get("description"),
+            result=questionnaire.model_dump_json(),
+            llm_model=self.vacancy_ai_assistant.llm_client.model,
+        )
+        logger.info("✅ Анкета (письмо) сгенерирована. ID вакансии: %s.", vacancy_id)
+        return questionnaire
+
+    async def gen_resume_questionnaire(self, vacancy_id: str, user_id: str | None = None) -> QuestionnaireResponseSchema:
+        """Генерирует анкету для составления персонализированных рекомендаций по резюме.
+
+        Args:
+            vacancy_id: Уникальный идентификатор вакансии.
+            user_id: Идентификатор пользователя для поиска вакансии в избранном.
+
+        Returns:
+            Объект QuestionnaireResponseSchema с вопросами анкеты.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена.
+            VacanciesServiceError: При ошибке валидации данных.
+        """
+        logger.info("🤖 Генерация анкеты (резюме). ID вакансии: %s.", vacancy_id)
+        vacancy = await self._get_vacancy_by_id_from_favorites(vacancy_id=vacancy_id, user_id=user_id)
+        vacancy_dict = vacancy.model_dump()
+        questionnaire = await self.vacancy_ai_assistant.gen_resume_questionnaire(
+            vacancy=vacancy_dict,
+            schema=QuestionnaireResponseSchema,
+        )
+        await self.assistant_session_repository.save_session(
+            session_type="resume_questionnaire",
+            vacancy_id=vacancy_id,
+            vacancy_name=vacancy_dict.get("vacancy_name", ""),
+            employer_name=vacancy_dict.get("employer_name"),
+            employer_location=vacancy_dict.get("employer_location"),
+            employment=vacancy_dict.get("employment"),
+            salary=vacancy_dict.get("salary"),
+            description=vacancy_dict.get("description"),
+            result=questionnaire.model_dump_json(),
+            llm_model=self.vacancy_ai_assistant.llm_client.model,
+        )
+        logger.info("✅ Анкета (резюме) сгенерирована. ID вакансии: %s.", vacancy_id)
+        return questionnaire
+
+    async def gen_cover_letter_by_questionnaire(
+        self, vacancy_id: str, answers: list[dict], user_id: str | None = None
+    ) -> str:
+        """Генерирует персонализированное сопроводительное письмо на основе анкеты.
+
+        Args:
+            vacancy_id: Уникальный идентификатор вакансии.
+            answers: Список ответов соискателя на вопросы анкеты.
+
+        Returns:
+            HTML-строка с персонализированным сопроводительным письмом.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена.
+            VacanciesServiceError: При ошибке валидации данных.
+        """
+        logger.info(
+            "🤖 Генерация персонализированного письма. ID вакансии: %s, ответов: %d.",
+            vacancy_id, len(answers),
+        )
+        vacancy = await self._get_vacancy_by_id_from_favorites(vacancy_id=vacancy_id, user_id=user_id)
+        vacancy_dict = vacancy.model_dump()
+        cover_letter = await self.vacancy_ai_assistant.gen_cover_letter_by_questionnaire(
+            vacancy=vacancy_dict,
+            questionnaire=answers,
+        )
+        await self.assistant_session_repository.save_session(
+            session_type="cover_letter_by_questionnaire",
+            vacancy_id=vacancy_id,
+            vacancy_name=vacancy_dict.get("vacancy_name", ""),
+            employer_name=vacancy_dict.get("employer_name"),
+            employer_location=vacancy_dict.get("employer_location"),
+            employment=vacancy_dict.get("employment"),
+            salary=vacancy_dict.get("salary"),
+            description=vacancy_dict.get("description"),
+            answers=answers,
+            result=cover_letter,
+            llm_model=self.vacancy_ai_assistant.llm_client.model,
+        )
+        logger.info("✅ Персонализированное письмо сгенерировано. ID вакансии: %s.", vacancy_id)
+        return cover_letter
+
+    async def gen_resume_tips_by_questionnaire(
+        self, vacancy_id: str, answers: list[dict], user_id: str | None = None
+    ) -> str:
+        """Генерирует персонализированные рекомендации по резюме на основе анкеты.
+
+        Args:
+            vacancy_id: Уникальный идентификатор вакансии.
+            answers: Список ответов соискателя на вопросы анкеты.
+
+        Returns:
+            HTML-строка с персонализированными рекомендациями по резюме.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена.
+            VacanciesServiceError: При ошибке валидации данных.
+        """
+        logger.info(
+            "🤖 Генерация персонализированных рекомендаций по резюме. ID вакансии: %s, ответов: %d.",
+            vacancy_id, len(answers),
+        )
+        vacancy = await self._get_vacancy_by_id_from_favorites(vacancy_id=vacancy_id, user_id=user_id)
+        vacancy_dict = vacancy.model_dump()
+        resume_tips = await self.vacancy_ai_assistant.gen_resume_tips_by_questionnaire(
+            vacancy=vacancy_dict,
+            questionnaire=answers,
+        )
+        await self.assistant_session_repository.save_session(
+            session_type="resume_tips_by_questionnaire",
+            vacancy_id=vacancy_id,
+            vacancy_name=vacancy_dict.get("vacancy_name", ""),
+            employer_name=vacancy_dict.get("employer_name"),
+            employer_location=vacancy_dict.get("employer_location"),
+            employment=vacancy_dict.get("employment"),
+            salary=vacancy_dict.get("salary"),
+            description=vacancy_dict.get("description"),
+            answers=answers,
+            result=resume_tips,
+            llm_model=self.vacancy_ai_assistant.llm_client.model,
+        )
+        logger.info(
+            "✅ Персонализированные рекомендации по резюме сгенерированы. ID вакансии: %s.", vacancy_id
+        )
+        return resume_tips
 
     # Блок приватных методов для валидации населенного пункта и получения данных региона
     def _normalize_location(self, parts: list[str], hyphen: bool) -> str:
@@ -384,8 +676,8 @@ class VacanciesService:
             raise LocationValidationError(
                 location=location,
                 error_details=(
-                    f"The location name consists of too many parts. "
-                    f"Number of parts: {len(split_location)}, maximum: {self.MAX_COUNT_PARTS_IN_LOCATION}."
+                    f"Название населённого пункта содержит слишком много частей: {len(split_location)}, "
+                    f"максимум: {self.MAX_COUNT_PARTS_IN_LOCATION}."
                 )
             )
         
@@ -395,13 +687,13 @@ class VacanciesService:
         ):
             raise LocationValidationError(
                 location=location,
-                error_details="The location name must not contain numbers."
+                error_details="Название населённого пункта не должно содержать цифры."
             )
         
         if not re.search(r"^[А-Яа-яЁё\s\-]+\Z", location):
             raise LocationValidationError(
                 location=location,
-                error_details="The location name must contain only Russian letters."
+                error_details="Название населённого пункта должно содержать только русские буквы."
             )
     
     def _location_name_verification(self, location: str) -> str:
@@ -419,7 +711,7 @@ class VacanciesService:
         region_code_tv = region_data.get("code_tv")
 
         logger.info(
-            "Начинаю асинхронный сбор вакансий из внешних API для '%s' (коды региона: hh=%s, tv=%s)...",
+            "⚡ Асинхронный сбор вакансий из внешних API. Населённый пункт: '%s', коды региона: hh=%s, tv=%s",
             location, region_code_hh, region_code_tv
         )
 
@@ -442,14 +734,14 @@ class VacanciesService:
         hh_result = results[0]
         if isinstance(hh_result, (VacanciesNotFoundError, HHAPIRequestError, VacancyParseError)):
             logger.error(
-                "Ошибка при запросе или обработке данных от HH.ru API: %s",
+                "❌ Ошибка при получении данных от hh.ru: %s",
                 hh_result, exc_info=True
             )
             error_request_hh = True
             error_details_hh = getattr(hh_result, 'detail', str(hh_result))
         elif isinstance(hh_result, Exception):
             logger.error(
-                "Непредвиденная ошибка при запросе или обработке данных от HH.ru API: %s",
+                "❌ Непредвиденная ошибка при получении данных от hh.ru: %s",
                 hh_result, exc_info=True
             )
             error_request_hh = True
@@ -462,14 +754,14 @@ class VacanciesService:
         tv_result = results[1]
         if isinstance(tv_result, (VacanciesNotFoundError, TVAPIRequestError, VacancyParseError)):
             logger.error(
-                "Ошибка при запросе или обработке данных от trudvsem.ru API: %s",
+                "❌ Ошибка при получении данных от trudvsem.ru: %s",
                 tv_result, exc_info=True
             )
             error_request_tv = True
             error_details_tv = getattr(tv_result, 'detail', str(tv_result))
         elif isinstance(tv_result, Exception):
             logger.error(
-                "Непредвиденная ошибка при запросе или обработке данных от trudvsem.ru API: %s",
+                "❌ Непредвиденная ошибка при получении данных от trudvsem.ru: %s",
                 tv_result, exc_info=True
             )
             error_request_tv = True
@@ -481,7 +773,7 @@ class VacanciesService:
         all_vacancies_count = vacancies_count_hh + vacancies_count_tv
 
         logger.info(
-            "Асинхронный сбор вакансий из API завершен. Найдено: %d от hh.ru, %d от Работа России. Всего: %s",
+            "✅ Сбор вакансий завершён. hh.ru: %d, trudvsem.ru: %d. Итого: %s",
             vacancies_count_hh, vacancies_count_tv, all_vacancies_count
         )
 
@@ -498,39 +790,46 @@ class VacanciesService:
 
     async def _get_vacancies_tv_api(self, location: str, region_code_tv: str) -> dict:
         """Получает и парсит вакансии с сайта 'Работа России'."""
-        vacansies_raw = await self.tv_client_api.get_vacansies_in_region(
+        vacancies_raw = await self.tv_client_api.get_vacancies_in_region(
             region_code_tv=region_code_tv
         )
-        if not vacansies_raw:
+
+        if not vacancies_raw:
             raise VacanciesNotFoundError(
                 source="trudvsem.ru API",
                 region_code=region_code_tv,
                 location=location
             )
 
-        vacancies = self.vacancies_parser.parce_vacancies_tv(
-            vacancies=vacansies_raw, location=location
+        loop = asyncio.get_event_loop()
+        vacancies = await loop.run_in_executor(
+            None,
+            functools.partial(self.vacancies_parser.parse_vacancies_tv, vacancies=vacancies_raw, location=location),
         )
 
         return {"vacancies": vacancies, "vacancies_count": len(vacancies)}
 
     async def _get_vacancies_hh_api(self, location: str, region_code_hh: str) -> dict:
         """Получает и парсит вакансии с сайта 'hh.ru'."""
-        vacansies_raw = await self.hh_client_api.get_vacansies_in_location(
+        vacancies_raw = await self.hh_client_api.get_vacancies_in_location(
             location=location,
             region_code_hh=region_code_hh
         )
-        if not vacansies_raw:
+
+        if not vacancies_raw:
             raise VacanciesNotFoundError(
                 source="HH.ru API",
                 region_code=region_code_hh,
                 location=location
             )
 
-        vacancies = self.vacancies_parser.parce_vacancies_hh(
-            vacancies=vacansies_raw, location=location
+        loop = asyncio.get_event_loop()
+        vacancies = await loop.run_in_executor(
+            None,
+            functools.partial(self.vacancies_parser.parse_vacancies_hh, vacancies=vacancies_raw, location=location),
         )
-        return {"vacancies": vacancies, "vacancies_count": len(vacansies_raw)}
+
+        return {"vacancies": vacancies, "vacancies_count": len(vacancies_raw)}
 
     async def _save_vacancies_data(
         self,
@@ -539,7 +838,7 @@ class VacanciesService:
         vacancies: list[dict]
     ) -> None:
         """Сохраняет данные о вакансиях в БД, предварительно удаляя старые."""
-        logger.info("Начинаю обновление вакансий в БД для локации '%s'.", location)
+        logger.info("💾 Обновление вакансий в БД. Населённый пункт: '%s'.", location)
 
         await self.vacancies_repository.delete_vacancies_by_location(
             location=location
@@ -550,32 +849,170 @@ class VacanciesService:
                 vacancies=vacancies
             )
             logger.info(
-                "БД обновлена: сохранено %d новых вакансий для локации '%s'.",
+                "✅ Вакансии сохранены в БД: %d записей. Населённый пункт: '%s'.",
                 all_vacancies_count, location
             )
         else:
             logger.info(
-                "БД обновлена: новые вакансии для локации '%s' не найдены, старые данные удалены.",
+                "💾 Вакансии в БД обновлены: новых записей нет, старые удалены. Населённый пункт: '%s'.",
                 location
             )
 
     # Блок приватных методов для запроса информации по отдельной вакансии
+    async def _get_vacancy_by_id_from_favorites(
+            self,
+            vacancy_id: str,
+            user_id: str | None = None
+    ) -> VacancySchema:
+        """
+        Возвращает детальную информацию по вакансии из избранного с TTL-логикой.
+
+        Если данные свежие (< FAVORITES_TTL_HOURS) — возвращает snapshot из БД.
+        Если устарели — обновляет через внешний API и сохраняет в БД.
+        При ошибке API возвращает snapshot.
+
+        Args:
+            vacancy_id: Уникальный идентификатор вакансии.
+            user_id: Идентификатор пользователя. Если указан — ищет вакансию только
+                     среди избранного этого пользователя. Если None — среди всех записей.
+
+        Returns:
+            Объект `VacancySchema` с детальной информацией о вакансии.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена в избранном.
+            VacanciesServiceError: При ошибке валидации или неизвестном источнике.
+        """
+        logger.info("🔍 Поиск вакансии в избранном. ID: %s", vacancy_id)
+
+        vacancy_raw = await self.favorites_repository.get_vacancy_by_id(
+            vacancy_id=vacancy_id, user_id=user_id
+        )
+        if not vacancy_raw:
+            logger.warning("⚠️ Вакансия не найдена в таблице избранного. ID: %s", vacancy_id)
+            raise VacancyNotFoundError(
+                vacancy_id=vacancy_id,
+                error_details="Вакансия с указанным ID не найдена в избранном."
+            )
+
+        ttl_threshold = datetime.now(timezone.utc) - timedelta(hours=self.FAVORITES_TTL_HOURS)
+        updated_at = vacancy_raw.updated_at
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
+
+        if updated_at >= ttl_threshold:
+            logger.info("✅ Вакансия в избранном свежая (<24h). ID: %s. Возвращаем из БД.", vacancy_id)
+            result = VacancySchema.model_validate(vacancy_raw)
+            result.is_favorite = True
+            return result
+
+        logger.info(
+            "🔄 Вакансия в избранном устарела (>24h). ID: %s, источник: %s. Запрашиваем из источника.",
+            vacancy_id, vacancy_raw.vacancy_source
+        )
+        try:
+            vacancy_data = await self._fetch_vacancy_details_from_api(
+                vacancy_id=vacancy_raw.vacancy_id,
+                vacancy_source=vacancy_raw.vacancy_source,
+                employer_code=vacancy_raw.employer_code,
+            )
+
+            update_data = {k: v for k, v in vacancy_data.items() if k != "is_favorite"}
+            await self.favorites_repository.update_vacancy(
+                vacancy_id=vacancy_raw.vacancy_id,
+                user_id=vacancy_raw.user_id,
+                data=update_data,
+            )
+            try:
+                result = VacancySchema.model_validate(vacancy_data)
+                result.is_favorite = True
+                return result
+            except ValidationError as error:
+                raise VacanciesServiceError(
+                    error_details="Ошибка валидации данных при получении информации о вакансии из избранного."
+                ) from error
+
+        except VacancyNotFoundError:
+            logger.warning(
+                "⚠️ Вакансия не найдена во внешнем источнике. ID: %s. Обновляем статус.",
+                vacancy_id
+            )
+            await self.favorites_repository.update_vacancy(
+                vacancy_id=vacancy_raw.vacancy_id,
+                user_id=vacancy_raw.user_id,
+                data={"status": self.FLAG_VACANCY_NOT_FOUND},
+            )
+            result = VacancySchema.model_validate(vacancy_raw)
+            result.status = self.FLAG_VACANCY_NOT_FOUND
+            result.is_favorite = True
+            return result
+
+        except (HHAPIRequestError, TVAPIRequestError) as error:
+            logger.error(
+                "❌ Ошибка API при получении вакансии из избранного. ID: %s: %s",
+                vacancy_id, error
+            )
+            result = VacancySchema.model_validate(vacancy_raw)
+            result.is_favorite = True
+            return result
+
+    async def _fetch_vacancy_details_from_api(
+        self,
+        vacancy_id: str,
+        vacancy_source: str,
+        employer_code: str,
+    ) -> dict:
+        """
+        Запрашивает детальную информацию о вакансии из внешнего API по источнику.
+
+        Args:
+            vacancy_id: Идентификатор вакансии.
+            vacancy_source: Источник ('hh.ru' или 'trudvsem.ru').
+            employer_code: Код работодателя (нужен для trudvsem.ru).
+
+        Returns:
+            Словарь с детальными данными вакансии.
+
+        Raises:
+            VacancyNotFoundError: Если вакансия не найдена во внешнем источнике.
+            HHAPIRequestError: При ошибке запроса к hh.ru.
+            TVAPIRequestError: При ошибке запроса к trudvsem.ru.
+            VacanciesServiceError: Если источник вакансии неизвестен.
+        """
+        if vacancy_source == "hh.ru":
+            logger.info("🔍 Запрашиваем детальную информацию из hh.ru. ID: %s", vacancy_id)
+            return await self._get_vacancy_details_hh_api(vacancy_id=vacancy_id)
+        elif vacancy_source == "trudvsem.ru":
+            logger.info("🔍 Запрашиваем детальную информацию из trudvsem.ru. ID: %s", vacancy_id)
+            return await self._get_vacancy_details_tv_api(
+                vacancy_id=vacancy_id,
+                employer_code=employer_code,
+            )
+        else:
+            logger.warning(
+                "⚠️ Неизвестный источник вакансии: '%s'. ID вакансии: %s.",
+                vacancy_source, vacancy_id
+            )
+            raise VacanciesServiceError(
+                error_details=f"Неизвестный источник вакансии: '{vacancy_source}'."
+            )
+
     async def _get_vacancy_details_hh_api(self, vacancy_id: str):
         """Получает и парсит детальную информацию о вакансии от hh.ru API."""
         vacancy_request_result = await self.hh_client_api.get_one_vacancy(
             vacancy_id=vacancy_id
         )
-
         search_status = vacancy_request_result.get("search_status")
         if search_status == self.FLAG_VACANCY_NOT_FOUND:
+            logger.warning("⚠️ Вакансия не найдена в hh.ru. ID: %s", vacancy_id)
             raise VacancyNotFoundError(
                 vacancy_id=vacancy_id,
-                error_details="Could not find vacancy details on the external source (hh.ru)."
+                error_details="Вакансия не найдена во внешнем источнике (hh.ru)."
             )
 
         vacancy_raw = vacancy_request_result.get("response_data")
 
-        return self.vacancies_parser.parce_vacancy_details_hh(vacancy=vacancy_raw)
+        return self.vacancies_parser.parse_vacancy_details_hh(vacancy=vacancy_raw)
 
     async def _get_vacancy_details_tv_api(self, vacancy_id: str, employer_code: str):
         """Получает и парсит детальную информацию о вакансии от trudvsem.ru API."""
@@ -584,12 +1021,13 @@ class VacanciesService:
             employer_code=employer_code
         )
         if not vacancy_raw:
+            logger.warning("⚠️ Вакансия не найдена в trudvsem.ru. ID: %s", vacancy_id)
             raise VacancyNotFoundError(
                 vacancy_id=vacancy_id,
-                error_details="Could not find vacancy details on the external source (trudvsem.ru)."
+                error_details="Вакансия не найдена во внешнем источнике (trudvsem.ru)."
             )
         
-        return self.vacancies_parser.parce_vacancy_details_tv(
+        return self.vacancies_parser.parse_vacancy_details_tv(
             vacancy=vacancy_raw
         )
 
@@ -599,52 +1037,86 @@ class VacanciesService:
             vacancy_id=vacancy_id
         )
         if not vacancy_raw:
+            logger.warning("⚠️ Вакансия не найдена в БД. ID: %s", vacancy_id)
             raise VacancyNotFoundError(
                 vacancy_id=vacancy_id,
-                error_details="A vacancy with the specified ID was not found."
+                error_details="Вакансия с указанным ID не найдена."
             )
 
         try:
-            vacancy = VacancyOutSchema.model_validate(vacancy_raw)
+            vacancy = VacancySchema.model_validate(vacancy_raw)
             return vacancy
         except ValidationError as error:
             raise VacanciesServiceError(
-                error_details="An error occurred during data validation."
+                error_details="Ошибка валидации данных вакансии."
             ) from error
 
     async def _fetch_one_favorite_vacancy(self, vacancy: FavoriteVacancies) -> dict:
         """
-        Асинхронно получает детальную информацию по одной вакансии,
-        контролируя количество одновременных запросов с помощью семафора.
-        В случае ошибки возвращает исходные данные с измененным статусом.
+        Асинхронно получает детальную информацию по одной вакансии с TTL-логикой.
+
+        Если данные свежие (< FAVORITES_TTL_HOURS) — возвращает snapshot из БД.
+        Если устарели — обновляет через внешний API и сохраняет в БД.
+        При ошибке API возвращает snapshot, не ломая список.
         """
         async with self.semaphore:
-            try:
-                if vacancy.vacancy_source == "hh.ru":
-                    return await self._get_vacancy_details_hh_api(
-                        vacancy_id=vacancy.vacancy_id
-                    )
-                if vacancy.vacancy_source == "Работа России":
-                    return await self._get_vacancy_details_tv_api(
-                        vacancy_id=vacancy.vacancy_id,
-                        employer_code=vacancy.employer_code,
-                    )
-                # Если источник неизвестен, логируем и возвращаем как "не найдено"
-                logger.warning(
-                    "Unknown vacancy source '%s' for favorite vacancy ID %s.",
-                    vacancy.vacancy_source, vacancy.vacancy_id
-                )
-                raise VacancyNotFoundError(vacancy_id=vacancy.vacancy_id)
+            ttl_threshold = datetime.now(timezone.utc) - timedelta(hours=self.FAVORITES_TTL_HOURS)
+            updated_at = vacancy.updated_at
+            if updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=timezone.utc)
 
-            except (VacancyNotFoundError, HHAPIRequestError, TVAPIRequestError) as error:
+            if updated_at >= ttl_threshold:
+                logger.info(
+                    "✅ Избранная вакансия свежая (<24h). ID: %s. Возвращаем из БД.",
+                    vacancy.vacancy_id
+                )
+                result = VacancySchema.model_validate(vacancy).model_dump()
+                result["is_favorite"] = True
+                return result
+
+            logger.info(
+                "🔄 Избранная вакансия устарела (>24h). ID: %s. Запрашиваем из источника.",
+                vacancy.vacancy_id
+            )
+            try:
+                vacancy_data = await self._fetch_vacancy_details_from_api(
+                    vacancy_id=vacancy.vacancy_id,
+                    vacancy_source=vacancy.vacancy_source,
+                    employer_code=vacancy.employer_code,
+                )
+
+                update_data = {k: v for k, v in vacancy_data.items() if k != "is_favorite"}
+                await self.favorites_repository.update_vacancy(
+                    vacancy_id=vacancy.vacancy_id,
+                    user_id=vacancy.user_id,
+                    data=update_data,
+                )
+                vacancy_data["is_favorite"] = True
+                return vacancy_data
+
+            except VacancyNotFoundError:
+                logger.warning(
+                    "⚠️ Вакансия не найдена во внешнем источнике. ID: %s. Обновляем статус.",
+                    vacancy.vacancy_id
+                )
+                await self.favorites_repository.update_vacancy(
+                    vacancy_id=vacancy.vacancy_id,
+                    user_id=vacancy.user_id,
+                    data={"status": self.FLAG_VACANCY_NOT_FOUND},
+                )
+                vacancy_dict = VacancySchema.model_validate(vacancy).model_dump()
+                vacancy_dict["status"] = self.FLAG_VACANCY_NOT_FOUND
+                vacancy_dict["is_favorite"] = True
+                return vacancy_dict
+
+            except (HHAPIRequestError, TVAPIRequestError) as error:
                 logger.error(
-                    "Failed to fetch details for favorite vacancy %s: %s",
+                    "❌ Ошибка API при обновлении избранной вакансии %s: %s",
                     vacancy.vacancy_id, error
                 )
-                # Используем Pydantic схему для преобразования в словарь
-                vacancy_dict = VacancyDetailsOutSchema.model_dump(vacancy)
-                vacancy_dict["status"] = self.FLAG_VACANCY_NOT_FOUND
-                return vacancy_dict
+                result = VacancySchema.model_validate(vacancy).model_dump()
+                result["is_favorite"] = True
+                return result
 
     async def _compile_enriched_favorite_vacancies(
         self, vacancies_raw: list[FavoriteVacancies]
@@ -653,7 +1125,7 @@ class VacanciesService:
         Обогащает список избранных вакансий актуальными данными из внешних API,
         используя семафор для ограничения одновременных запросов.
         """
-        logger.info("Обогащение и актуализация вакансий, добавленных в избранное")
+        logger.info("⚡ Обогащение данных избранных вакансий из внешних API.")
 
         tasks = [self._fetch_one_favorite_vacancy(vacancy) for vacancy in vacancies_raw]
         compiled_vacancies = await asyncio.gather(*tasks)

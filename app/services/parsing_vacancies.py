@@ -18,11 +18,11 @@ class VacanciesParsingService:
     SOCIAL_PROTECTED = "Инвалиды"
     FIRST_ELEMENT_LIST = 0
     VACANCY_SOURCES = {
-        "trudvsem": "Работа России",
+        "trudvsem": "trudvsem.ru",
         "hh": "hh.ru",
     }
 
-    def parce_vacancy_details_tv(self, vacancy: dict) -> dict:
+    def parse_vacancy_details_tv(self, vacancy: dict) -> dict:
         """
         Обрабатывает и преобразует детальные данные одной вакансии от API Trudvsem.ru.
 
@@ -39,50 +39,60 @@ class VacanciesParsingService:
         employer_code = vacancy.get("company", {}).get("companycode")
 
         logger.info(
-            "Начинаю парсинг детальной информации для вакансии TV с ID: %s, company_code: %s",
+            "📦 Парсинг детальной информации вакансии trudvsem.ru. ID: %s, код компании: %s",
             vacancy_id, employer_code
         )
         try:
             salary = vacancy.get("salary") or self.DEFAULT_SALARY
             employer_name = vacancy.get("company", {}).get("name")
 
+            requirement = vacancy.get("requirement") or {}
+            experience_required = requirement.get("education", self.DEFAULT_NOT_SPECIFIED)
+            requirements = vacancy.get("requirements", self.DEFAULT_NOT_SPECIFIED) or self.DEFAULT_NOT_SPECIFIED
+
             pars_vacancy_data = {
-                "vacancy_name": vacancy.get("job-name"),
                 "vacancy_id": vacancy_id,
+                "vacancy_name": vacancy.get("job-name"),
+                "location": self.DEFAULT_NOT_SPECIFIED,
                 "status": "actual",
                 "vacancy_url": vacancy.get("vac_url"),
-                "social_protected": vacancy.get("social_protected"),
-                "vacancy_source": "Работа России",
+                "vacancy_source": self.VACANCY_SOURCES.get("trudvsem"),
                 "description": self._get_vacancy_duty_tv(vacancy=vacancy),
-                "employer_location": self._get_employer_location_tv(vacancy=vacancy),
                 "salary": salary,
                 "employer_name": employer_name,
-                "company_code": employer_code,
+                "employer_location": self._get_employer_location_tv(vacancy=vacancy),
                 "employer_phone": self._get_contact_phone_number_tv(vacancy=vacancy),
+                "employer_code": employer_code,
                 "employer_email": self._get_contact_email_tv(vacancy=vacancy),
                 "contact_person": vacancy.get("contact_person", self.DEFAULT_NOT_SPECIFIED),
                 "employment": vacancy.get("employment", self.DEFAULT_NOT_SPECIFIED),
+                "schedule": vacancy.get("schedule", self.DEFAULT_NOT_SPECIFIED),
+                "work_format": self.DEFAULT_NOT_SPECIFIED,
+                "experience_required": experience_required,
+                "requirements": requirements,
+                "category": vacancy.get("category", {}).get("specialisation", self.DEFAULT_NOT_SPECIFIED),
+                "social_protected": vacancy.get("social_protected", self.DEFAULT_NOT_SPECIFIED),
             }
             logger.info(
-                "Результат парсинга вакансии TV с ID %s:\n%s",
+                "✅ Вакансия trudvsem.ru распарсена. ID: %s:\n%s",
                 vacancy_id,
                 pformat(pars_vacancy_data)
             )
             return pars_vacancy_data
         except Exception as error:
             logger.exception(
-                'Ошибка при обработке вакансии от Trudvsem с ID %s: %s',
+                "❌ Ошибка парсинга вакансии trudvsem.ru. ID: %s. Детали: %s",
                 vacancy_id,
                 error
             )
             raise VacancyParseError(
-                error_details="An error occurred while processing the vacancy data.",
+                error_details="Ошибка при обработке данных вакансии.",
                 vacancy_id=vacancy_id,
                 employer_code=employer_code,
                 source="trudvsem.ru API",
             )
 
-    def parce_vacancy_details_hh(self, vacancy: dict) -> dict:
+    def parse_vacancy_details_hh(self, vacancy: dict) -> dict:
         """
         Обрабатывает и преобразует детальные данные одной вакансии от API hh.ru.
 
@@ -97,7 +107,7 @@ class VacanciesParsingService:
         """
         vacancy_id = vacancy.get("id")
         logger.info(
-            "Начинаю парсинг детальной информации для вакансии HH с ID: %s",
+            "📦 Парсинг детальной информации вакансии hh.ru. ID: %s",
             vacancy_id
         )
         try:
@@ -115,47 +125,73 @@ class VacanciesParsingService:
             )
 
             employment = (
-                vacancy.get("employment", {}).get("name")
-                if isinstance(vacancy.get("employment"), dict)
+                vacancy.get("employment_form", {}).get("name")
+                if isinstance(vacancy.get("employment_form"), dict)
                 else self.DEFAULT_NOT_SPECIFIED
             )
+            experience_required = (
+                vacancy.get("experience", {}).get("name", self.DEFAULT_NOT_SPECIFIED)
+                if isinstance(vacancy.get("experience"), dict)
+                else self.DEFAULT_NOT_SPECIFIED
+            )
+            key_skills = vacancy.get("key_skills") or []
+            requirements = (
+                ", ".join(s.get("name", "") for s in key_skills if s.get("name"))
+                or self.DEFAULT_NOT_SPECIFIED
+            )
+            work_format_list = vacancy.get("work_format") or []
+            work_format = (
+                ", ".join(wf.get("name", "") for wf in work_format_list if wf.get("name"))
+                or self.DEFAULT_NOT_SPECIFIED
+            )
+            category = (
+                vacancy.get("professional_roles", [{}])[self.FIRST_ELEMENT_LIST]
+                .get("name", self.DEFAULT_NOT_SPECIFIED)
+                if vacancy.get("professional_roles") else self.DEFAULT_NOT_SPECIFIED
+            )
             parsed_vacancy = {
-                "status": self._get_vacancy_status_hh(vacancy=vacancy),
-                "vacancy_name": vacancy.get("name", self.DEFAULT_NOT_SPECIFIED),
                 "vacancy_id": vacancy_id,
+                "vacancy_name": vacancy.get("name", self.DEFAULT_NOT_SPECIFIED),
+                "location": vacancy.get("area", {}).get("name", self.DEFAULT_NOT_SPECIFIED),
+                "status": self._get_vacancy_status_hh(vacancy=vacancy),
                 "vacancy_url": vacancy.get("alternate_url"),
-                "social_protected": self.SOCIAL_PROTECTED,
-                "vacancy_source": "hh.ru",
+                "vacancy_source": self.VACANCY_SOURCES.get("hh"),
                 "description": self._get_vacancy_description_hh(vacancy=vacancy),
-                "employer_location": self._get_employer_location_hh(vacancy=vacancy),
                 "salary": self._get_vacancy_salary_hh(vacancy=vacancy),
                 "employer_name": employer_name,
-                "company_code": employer_code,
+                "employer_location": self._get_employer_location_hh(vacancy=vacancy),
                 "employer_phone": employer_phone,
+                "employer_code": employer_code,
                 "employer_email": employer_email,
                 "contact_person": self.DEFAULT_NOT_SPECIFIED,
                 "employment": employment,
+                "schedule": self.DEFAULT_NOT_SPECIFIED,
+                "work_format": work_format,
+                "experience_required": experience_required,
+                "requirements": requirements,
+                "category": category,
+                "social_protected": self.SOCIAL_PROTECTED,
             }
             logger.info(
-                "Результат парсинга вакансии HH с ID %s:\n%s",
+                "✅ Вакансия hh.ru распарсена. ID: %s:\n%s",
                 vacancy_id,
                 pformat(parsed_vacancy)
             )
             return parsed_vacancy
         except Exception as error:
             logger.exception(
-                "Ошибка при обработке вакансии от hh.ru с ID %s: %s",
+                "❌ Ошибка парсинга вакансии hh.ru. ID: %s. Детали: %s",
                 vacancy_id,
                 error
             )
             raise VacancyParseError(
-                error_details="An error occurred while processing the vacancy data.",
+                error_details="Ошибка при обработке данных вакансии.",
                 vacancy_id=vacancy_id,
                 employer_code=employer_code,
                 source="HH.ru API",
             )
 
-    def parce_vacancies_tv(self, vacancies: list[dict], location: str) -> list[dict]:
+    def parse_vacancies_tv(self, vacancies: list[dict], location: str) -> list[dict]:
         """
         Обрабатывает и преобразует список вакансий от API Trudvsem.ru.
 
@@ -170,14 +206,22 @@ class VacanciesParsingService:
             VacancyParseError: Если в процессе обработки списка возникает ошибка.
         """
         logger.info(
-            "Начинаю парсинг списка вакансий от Trudvsem для локации '%s'.",
+            "📦 Парсинг списка вакансий trudvsem.ru. Населённый пункт: '%s'.",
             location
         )
         parsed_vacancies = []
 
+        pattern = rf"(?i)\b{location}\b"
+
         for vacancy_data in vacancies:
             try:
                 vacancy: dict = vacancy_data.get("vacancy", {})
+
+                vacancy_location = self._get_employer_location_tv(vacancy=vacancy)
+                
+                # фильтруем по локации
+                if not re.search(pattern, vacancy_location):
+                    continue
 
                 vacancy_id = vacancy.get("id")
 
@@ -200,45 +244,51 @@ class VacanciesParsingService:
 
                 parsed_vacancies.append(
                 {
-                    "vacancy_id": vacancy_id,
+                    "vacancy_id": str(vacancy_id) if vacancy_id is not None else self.DEFAULT_NOT_SPECIFIED,
                     "location": location,
-                    "name": vacancy.get("job-name"),
+                    "vacancy_name": vacancy.get("job-name") or self.DEFAULT_NOT_SPECIFIED,
+                    "status": "actual",
                     "description": self._get_vacancy_duty_tv(vacancy=vacancy),
                     "salary": salary,
-                    "vacancy_url": vacancy.get("vac_url"),
+                    "vacancy_url": vacancy.get("vac_url") or self.DEFAULT_NOT_SPECIFIED,
                     "vacancy_source": self.VACANCY_SOURCES.get("trudvsem"),
-                    "employer_name": employer_name,
-                    "employer_location": self._get_employer_location_tv(vacancy=vacancy),
+                    "employer_name": employer_name or self.DEFAULT_NOT_SPECIFIED,
+                    "employer_location": vacancy_location,
                     "employer_phone": self._get_contact_phone_number_tv(vacancy=vacancy),
-                    "employer_code": employer_code,
+                    "employer_code": str(employer_code) if employer_code is not None else self.DEFAULT_NOT_SPECIFIED,
+                    "employer_email": self._get_contact_email_tv(vacancy=vacancy),
+                    "contact_person": vacancy.get("contact_person", self.DEFAULT_NOT_SPECIFIED),
+                    "employment": vacancy.get("employment") or self.DEFAULT_NOT_SPECIFIED,
+                    "schedule": vacancy.get("schedule") or self.DEFAULT_NOT_SPECIFIED,
+                    "work_format": self.DEFAULT_NOT_SPECIFIED,
                     "experience_required": experience,
+                    "requirements": vacancy.get("requirements", self.DEFAULT_NOT_SPECIFIED) or self.DEFAULT_NOT_SPECIFIED,
                     "category": category,
-                    "employment_type": vacancy.get("employment") or self.DEFAULT_NOT_SPECIFIED,
-                    "schedule": vacancy.get("schedule"),
+                    "social_protected": vacancy.get("social_protected", self.DEFAULT_NOT_SPECIFIED),
                 }
             )
             
             except Exception as error:
                 logger.exception(
-                    "Ошибка при обработке списка вакансий от Trudvsem для локации '%s': %s",
+                    "❌ Ошибка парсинга списка вакансий trudvsem.ru. Населённый пункт: '%s'. Детали: %s",
                     location,
                     error
                 )
                 raise VacancyParseError(
-                    error_details="An error occurred while processing the vacancy list.",
+                    error_details="Ошибка при обработке списка вакансий.",
                     vacancy_id=vacancy_id,
                     employer_code=employer_code,
                     source="trudvsem.ru API",
                 )
 
         logger.info(
-            "Обработано %d вакансий от Trudvsem для локации '%s'.",
+            "✅ Парсинг завершён (trudvsem.ru). Обработано вакансий: %d. Населённый пункт: '%s'.",
             len(parsed_vacancies),
             location
         )
         return parsed_vacancies
 
-    def parce_vacancies_hh(self, vacancies: list[dict], location: str) -> list[dict]:
+    def parse_vacancies_hh(self, vacancies: list[dict], location: str) -> list[dict]:
         """
         Обрабатывает и преобразует список вакансий от API hh.ru.
 
@@ -253,7 +303,7 @@ class VacanciesParsingService:
             VacancyParseError: Если в процессе обработки списка возникает ошибка.
         """
         logger.info(
-            "Начинаю парсинг списка вакансий от hh.ru для локации '%s'.",
+            "📦 Парсинг списка вакансий hh.ru. Населённый пункт: '%s'.",
             location
         )
 
@@ -273,50 +323,60 @@ class VacanciesParsingService:
                     vacancy.get("professional_roles", [{}])[self.FIRST_ELEMENT_LIST]
                     .get("name", self.DEFAULT_NOT_SPECIFIED)
                 )
-                employment_type = (
-                    vacancy.get("employment", {})
-                    .get("name", self.DEFAULT_NOT_SPECIFIED)
+                employment = (
+                    vacancy.get("employment_form", {}).get("name", self.DEFAULT_NOT_SPECIFIED)
+                    if isinstance(vacancy.get("employment_form"), dict)
+                    else self.DEFAULT_NOT_SPECIFIED
                 )
-                schedule = (
-                    vacancy.get("schedule", {})
-                    .get("name", self.DEFAULT_NOT_SPECIFIED)
+                work_format_list = vacancy.get("work_format") or []
+                work_format = (
+                    ", ".join(wf.get("name", "") for wf in work_format_list if wf.get("name"))
+                    or self.DEFAULT_NOT_SPECIFIED
                 )
+                contacts = vacancy.get("contacts") or {}
+                employer_email = contacts.get("email") or self.DEFAULT_EMAIL
                 parsed_vacancies.append(
                     {
-                        "vacancy_id": vacancy_id,
+                        "vacancy_id": str(vacancy_id) if vacancy_id is not None else self.DEFAULT_NOT_SPECIFIED,
                         "location": location,
-                        "name": vacancy.get("name"),
-                        "description": self._get_many_vacancies_description_hh(vacancy=vacancy),
+                        "vacancy_name": vacancy.get("name") or self.DEFAULT_NOT_SPECIFIED,
+                        "status": "archival" if vacancy.get("archived") else "actual",
+                        "description": self._get_many_vacancies_description_hh(vacancy=vacancy) or self.DEFAULT_NOT_SPECIFIED,
                         "salary": self._get_vacancy_salary_hh(vacancy=vacancy),
-                        "vacancy_url": vacancy.get("alternate_url"),
-                        'vacancy_source': self.VACANCY_SOURCES.get("hh"),
+                        "vacancy_url": vacancy.get("alternate_url") or self.DEFAULT_NOT_SPECIFIED,
+                        "vacancy_source": self.VACANCY_SOURCES.get("hh"),
                         "employer_name": self._get_employer_name_hh(vacancy=vacancy),
                         "employer_location": self._get_employer_location_hh(
                             vacancy=vacancy, location=location
                         ),
                         "employer_phone": self._get_contact_phone_number_hh(vacancy=vacancy),
-                        "employer_code": employer_code,
+                        "employer_code": str(employer_code) if employer_code is not None else self.DEFAULT_NOT_SPECIFIED,
+                        "employer_email": employer_email,
+                        "contact_person": self.DEFAULT_NOT_SPECIFIED,
+                        "employment": employment,
+                        "schedule": self.DEFAULT_NOT_SPECIFIED,
+                        "work_format": work_format,
                         "experience_required": experience_required,
+                        "requirements": self.DEFAULT_NOT_SPECIFIED,
                         "category": category,
-                        'employment_type': employment_type,
-                        "schedule": schedule,
+                        "social_protected": self.SOCIAL_PROTECTED,
                     }
                 )
             except Exception as error:
                 logger.exception(
-                    "Ошибка при обработке списка вакансий от hh.ru для локации '%s': %s",
+                    "❌ Ошибка парсинга списка вакансий hh.ru. Населённый пункт: '%s'. Детали: %s",
                     location,
                     error
                 )
                 raise VacancyParseError(
-                    error_details="An error occurred while processing the vacancy list.",
+                    error_details="Ошибка при обработке списка вакансий.",
                     vacancy_id=vacancy_id,
                     employer_code=employer_code,
                     source="HH.ru API",
                 )
         
         logger.info(
-            "Обработано %d вакансий от hh.ru для локации '%s'.",
+            "✅ Парсинг завершён (hh.ru). Обработано вакансий: %d. Населённый пункт: '%s'.",
             len(parsed_vacancies),
             location
         )
@@ -376,7 +436,7 @@ class VacanciesParsingService:
         """Определяет статус вакансии hh.ru (актуальная или архивная)."""
         archived = vacancy.get('archived')
         if archived:
-            logger.info("Вакнасия с vacancy_id=%s перенесаперенесена в архив", vacancy.get("id"))
+            logger.info("⚠️ Вакансия hh.ru перенесена в архив. ID: %s", vacancy.get("id"))
             return "archival"
         return "actual"
 

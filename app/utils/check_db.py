@@ -11,5 +11,5 @@ async def check_db_connection(db_session: AsyncSession) -> bool:
     try:
         await db_session.execute(text("SELECT 1"))
     except Exception as error:
-        logger.error("Database connection check failed: %s", {str(error)})
-        raise RuntimeError('Database connection test failed') from error
+        logger.error("❌ Ошибка подключения к базе данных: %s", error)
+        raise RuntimeError('Проверка подключения к базе данных не прошла.') from error

@@ -18,9 +18,52 @@ logger = logging.getLogger(__name__)
     status_code=status.HTTP_200_OK,
     summary="Получить список всех регионов",
     description="Возвращает полный список всех регионов.",
+    operation_id="getRegionsList",
+    response_description="Полный список регионов",
     responses={
-        200: {"description": "Данные о регионах успешно получены."},
-        500: {"description": "Внутренняя ошибка сервера."},
+        200: {
+            "description": "Данные о регионах успешно получены.",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "name": "Удмуртская Республика",
+                            "region_code": "18",
+                            "federal_district_code": "33",
+                        },
+                        {
+                            "name": "Республика Татарстан",
+                            "region_code": "16",
+                            "federal_district_code": "33",
+                        },
+                    ]
+                }
+            },
+        },
+        401: {
+            "description": "API-ключ отсутствует или невалиден.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid API key."}
+                }
+            },
+        },
+        403: {
+            "description": "API-ключ просрочен или деактивирован.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "API key has expired."}
+                }
+            },
+        },
+        500: {
+            "description": "Внутренняя ошибка сервера.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "A database error occurred while processing region data."}
+                }
+            },
+        },
     },
     response_model=list[RegionSchema],
 )
@@ -33,15 +76,15 @@ async def list_regions(region_service: RegionServiceDep) -> list[RegionSchema]:
     Returns:
         Полный список всех регионов.
     """
-    logger.info("Начало обработки /regions/list.")
+    logger.info("🚀 Запрос GET /regions/list.")
     try:
         region_data = await region_service.get_region_list()
-        logger.info("Успешное завершение /regions/list.")
+        logger.info("✅ Запрос GET /regions/list выполнен.")
 
         return region_data
     except (RegionRepositoryError, RegionServiceError) as error:
         logger.exception(
-            "Ошибка при получении списка регионов: %s",
+            "❌ Ошибка при получении списка регионов. Детали: %s",
             error,
         )
         raise HTTPException(status_code=error.status_code, detail=error.detail)
@@ -63,12 +106,60 @@ async def list_regions(region_service: RegionServiceDep) -> list[RegionSchema]:
         "* 41 — Сибирский федеральный округ\n"
         "* 42 — Дальневосточный федеральный округ"
     ),
+    operation_id="getRegionsByFederalDistrict",
+    response_description="Список регионов в указанном федеральном округе",
     responses={
-        200: {"description": "Данные о регионах успешно получены."},
-        404: {
-            "description": "Данные о регионах в заданном федеральном округе не найдены."
+        200: {
+            "description": "Данные о регионах успешно получены.",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "name": "Удмуртская Республика",
+                            "region_code": "18",
+                            "federal_district_code": "33",
+                        },
+                        {
+                            "name": "Республика Татарстан",
+                            "region_code": "16",
+                            "federal_district_code": "33",
+                        },
+                    ]
+                }
+            },
         },
-        500: {"description": "Внутренняя ошибка сервера."},
+        401: {
+            "description": "API-ключ отсутствует или невалиден.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid API key."}
+                }
+            },
+        },
+        403: {
+            "description": "API-ключ просрочен или деактивирован.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "API key has expired."}
+                }
+            },
+        },
+        404: {
+            "description": "Регионы в заданном федеральном округе не найдены.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Regions for federal district '99' not found."}
+                }
+            },
+        },
+        500: {
+            "description": "Внутренняя ошибка сервера.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "A database error occurred while processing region data."}
+                }
+            },
+        },
     },
     response_model=list[RegionSchema],
 )
@@ -91,7 +182,7 @@ async def list_regions_by_federal_district(
         Cписок регионов в заданном федеральном округе.
     """
     logger.info(
-        "Начало обработки /regions/by-federal-districts для округа %s.",
+        "🚀 Запрос GET /regions/by-federal-districts. Код округа: %s.",
         federal_district_code,
     )
     try:
@@ -99,7 +190,7 @@ async def list_regions_by_federal_district(
             federal_district_code=federal_district_code
         )
         logger.info(
-            "Успешное завершение /regions/by-federal-districts для округа %s.",
+            "✅ Запрос GET /regions/by-federal-districts выполнен. Код округа: %s.",
             federal_district_code,
         )
 
@@ -110,7 +201,7 @@ async def list_regions_by_federal_district(
         RegionServiceError,
     ) as error:
         logger.exception(
-            "Ошибка при получении регионов для округа %s: %s",
+            "❌ Ошибка при получении регионов по округу. Код: %s. Детали: %s",
             federal_district_code,
             error,
         )
