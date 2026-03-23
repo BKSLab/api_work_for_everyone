@@ -10,7 +10,6 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-latest-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/)
-[![Telegram Bot](https://img.shields.io/badge/Telegram-@work__for__all__people__bot-F5B800?style=flat-square&logo=telegram&logoColor=black)](https://t.me/work_for_all_people_bot)
 
 </div>
 
@@ -20,7 +19,7 @@
 
 **«Работа для всех»** — REST API для поиска вакансий в России, ориентированных на людей с инвалидностью. Сервис агрегирует данные из двух официальных источников — [Работа России](https://trudvsem.ru/) и [hh.ru](https://hh.ru/) — и предоставляет единый унифицированный доступ к ним.
 
-Создан как backend для Telegram-бота и веб-приложения с особым вниманием к доступности (WCAG 2.2 AA). Для взаимодействия через бота: [@work\_for\_all\_people\_bot](https://t.me/work_for_all_people_bot).
+REST API для поиска вакансий: агрегирует данные из двух источников и предоставляет единый унифицированный интерфейс для клиентских приложений.
 
 ---
 
@@ -356,8 +355,3 @@ ruff check .
 
 ---
 
-<div align="center">
-
-Разработано с вниманием к доступности — WCAG 2.2 AA
-
-</div>

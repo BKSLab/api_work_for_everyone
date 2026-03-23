@@ -234,9 +234,8 @@ class VacanciesParsingService:
                         "specialisation", self.DEFAULT_NOT_SPECIFIED
                     )
                 )
-                salary = (
-                    vacancy.get("salary") or self.DEFAULT_SALARY
-                )
+                raw_salary = vacancy.get("salary")
+                salary = str(raw_salary)[:295] if raw_salary is not None else self.DEFAULT_SALARY
                 employer_code = (
                     vacancy.get("company", {}).get("companycode")
                 )
@@ -339,7 +338,7 @@ class VacanciesParsingService:
                     {
                         "vacancy_id": str(vacancy_id) if vacancy_id is not None else self.DEFAULT_NOT_SPECIFIED,
                         "location": location,
-                        "vacancy_name": vacancy.get("name") or self.DEFAULT_NOT_SPECIFIED,
+                        "vacancy_name": (vacancy.get("name") or self.DEFAULT_NOT_SPECIFIED).replace("\x00", ""),
                         "status": "archival" if vacancy.get("archived") else "actual",
                         "description": self._get_many_vacancies_description_hh(vacancy=vacancy) or self.DEFAULT_NOT_SPECIFIED,
                         "salary": self._get_vacancy_salary_hh(vacancy=vacancy),
@@ -390,6 +389,7 @@ class VacanciesParsingService:
                 re.sub(r"<[^>]+>", "", duty_raw, flags=re.S)
                 .replace("&nbsp;", "")
                 .replace("&nbsp", "")
+                .replace("\x00", "")
             )
         else:
             duty = self.DEFAULT_DUTY
@@ -476,7 +476,7 @@ class VacanciesParsingService:
             else vacancy.get("area", {}).get("name", location)
         ) or self.DEFAULT_NOT_SPECIFIED
 
-        return employer_location
+        return employer_location.replace("\x00", "")
 
     def _get_contact_phone_number_hh(self, vacancy: dict) -> str:
         """Извлекает контактный номер телефона из данных hh.ru."""
@@ -507,5 +507,5 @@ class VacanciesParsingService:
             description += snippet["responsibility"]
         if snippet.get("requirement"):
             description += "\n\nТребования: " + snippet["requirement"]
-                
-        return description.strip()
+
+        return description.strip().replace("\x00", "")

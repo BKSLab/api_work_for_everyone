@@ -385,10 +385,16 @@ X-Api-Key: wfe_a1b2c3d4e5f6
 
 ```json
 {
-  "total": 42, "page": 1, "page_size": 10,
+  "total": 42,
+  "page": 1,
+  "page_size": 10,
+  "vacancies_count_hh": 30,
+  "vacancies_count_tv": 12,
   "items": [{ /* VacancySchema */ }]
 }
 ```
+
+`vacancies_count_hh` и `vacancies_count_tv` — количество вакансий по каждому источнику с учётом всех переданных фильтров (`keyword`, `source`).
 
 ---
 

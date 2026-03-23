@@ -22,24 +22,40 @@ _SESSION_TYPE_COLORS = {
     "resume_tips_by_questionnaire": "#22C55E",
 }
 
+_SESSION_TYPE_LABELS = {
+    "cover_letter_by_vacancy": "Письмо по вакансии",
+    "resume_tips_by_vacancy": "Советы по резюме (вакансия)",
+    "letter_questionnaire": "Анкета для письма",
+    "resume_questionnaire": "Анкета для резюме",
+    "cover_letter_by_questionnaire": "Письмо по анкете",
+    "resume_tips_by_questionnaire": "Советы по резюме (анкета)",
+}
+
 
 def _fmt_session_type(model: AssistantSession, attr: str) -> Markup:
     color = _SESSION_TYPE_COLORS.get(model.session_type, "#888")
+    label = _SESSION_TYPE_LABELS.get(model.session_type, model.session_type)
     return Markup(
         f'<span style="background:{color};color:#000;padding:2px 8px;'
         f'border-radius:4px;font-size:0.8em;font-weight:600;">'
-        f"{model.session_type}</span>"
+        f"{label}</span>"
     )
+
+
+_TEXT_STYLE = "white-space:pre-wrap;word-break:break-word;max-width:800px;display:block;"
 
 
 def _fmt_answers(model: AssistantSession, attr: str) -> Markup:
     if not model.answers:
         return Markup("<em>—</em>")
     items = "".join(
-        f"<li><b>{a.get('text', '?')}</b>: {a.get('answer', '—')}</li>"
+        f"<li style='margin-bottom:0.5em'>"
+        f"<div style='font-weight:600;margin-bottom:2px'>{a.get('text', '?')}</div>"
+        f"<div style='padding-left:0.8em'>{a.get('answer', '—')}</div>"
+        f"</li>"
         for a in model.answers
     )
-    return Markup(f"<ul style='margin:0;padding-left:1.2em'>{items}</ul>")
+    return Markup(f"<ul style='margin:0;padding-left:1.2em;list-style:none'>{items}</ul>")
 
 
 def _fmt_result(model: AssistantSession, attr: str) -> Markup:
@@ -49,8 +65,13 @@ def _fmt_result(model: AssistantSession, attr: str) -> Markup:
             pretty = json.dumps(parsed, ensure_ascii=False, indent=2)
         except (json.JSONDecodeError, TypeError):
             pretty = model.result
-        return Markup(f"<pre style='white-space:pre-wrap'>{pretty}</pre>")
-    return Markup(model.result)
+        return Markup(f"<pre style='{_TEXT_STYLE}'>{pretty}</pre>")
+    return Markup(f"<div style='{_TEXT_STYLE}'>{model.result}</div>")
+
+
+def _fmt_text(model: AssistantSession, attr: str) -> Markup:
+    value = getattr(model, attr, None) or ""
+    return Markup(f"<div style='{_TEXT_STYLE}'>{value}</div>")
 
 
 def _fmt_is_active(model: ApiKey, attr: str) -> Markup:
@@ -189,6 +210,9 @@ class AssistantSessionAdmin(ModelView, model=AssistantSession):
         AssistantSession.session_type: _fmt_session_type,
         AssistantSession.answers: _fmt_answers,
         AssistantSession.result: _fmt_result,
+        AssistantSession.description: _fmt_text,
+        AssistantSession.vacancy_name: _fmt_text,
+        AssistantSession.employer_name: _fmt_text,
     }
 
     can_create = False

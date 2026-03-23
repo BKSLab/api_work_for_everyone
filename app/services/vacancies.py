@@ -192,8 +192,13 @@ class VacanciesService:
             location, page, page_size, keyword, source
         )
 
-        total = await self.vacancies_repository.get_count_vacancies(
-            location=location, keyword=keyword, source=source
+        total, counts_by_source = await asyncio.gather(
+            self.vacancies_repository.get_count_vacancies(
+                location=location, keyword=keyword, source=source
+            ),
+            self.vacancies_repository.get_count_vacancies_by_source(
+                location=location, keyword=keyword, source=source
+            ),
         )
         if total == 0:
             items = []
@@ -230,6 +235,8 @@ class VacanciesService:
             total=total,
             page=page,
             page_size=page_size,
+            vacancies_count_hh=counts_by_source.get("hh.ru", 0),
+            vacancies_count_tv=counts_by_source.get("trudvsem.ru", 0),
             items=items
         )
 

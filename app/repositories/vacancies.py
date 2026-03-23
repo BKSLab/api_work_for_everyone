@@ -154,3 +154,32 @@ class VacanciesRepository:
             raise VacanciesRepositoryError(
                 error_details=f"Ошибка при подсчёте вакансий. Населённый пункт: {location}."
             ) from error
+
+    async def get_count_vacancies_by_source(
+        self,
+        location: str,
+        keyword: str | None = None,
+        source: str | None = None,
+    ) -> dict[str, int]:
+        """Возвращает количество вакансий по источникам с учётом фильтров."""
+        try:
+            stmt = (
+                select(Vacancies.vacancy_source, func.count())
+                .where(Vacancies.location == location)
+            )
+            if source:
+                stmt = stmt.where(Vacancies.vacancy_source == source)
+            if keyword:
+                stmt = stmt.where(
+                    or_(
+                        Vacancies.vacancy_name.ilike(f"%{keyword}%"),
+                        Vacancies.description.ilike(f"%{keyword}%"),
+                    )
+                )
+            stmt = stmt.group_by(Vacancies.vacancy_source)
+            result: Result = await self.db_session.execute(statement=stmt)
+            return {row[0]: row[1] for row in result.all()}
+        except (SQLAlchemyError, Exception) as error:
+            raise VacanciesRepositoryError(
+                error_details=f"Ошибка при подсчёте вакансий по источникам. Населённый пункт: {location}."
+            ) from error

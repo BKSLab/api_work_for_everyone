@@ -207,6 +207,8 @@ class VacanciesListSchema(BaseModel):
     total: int = Field(..., description='Общее количество вакансий, удовлетворяющих фильтрам.', examples=[142])
     page: int = Field(..., description='Текущий номер страницы.', examples=[1])
     page_size: int = Field(..., description='Количество вакансий на странице.', examples=[10])
+    vacancies_count_hh: int = Field(0, description='Количество вакансий из hh.ru с учётом фильтров.', examples=[84])
+    vacancies_count_tv: int = Field(0, description='Количество вакансий из trudvsem.ru с учётом фильтров.', examples=[58])
     items: list[VacancySchema] = Field(..., description='Список вакансий на текущей странице.')
 
 
