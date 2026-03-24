@@ -73,6 +73,7 @@ class VacanciesParsingService:
                 "category": vacancy.get("category", {}).get("specialisation", self.DEFAULT_NOT_SPECIFIED),
                 "social_protected": vacancy.get("social_protected", self.DEFAULT_NOT_SPECIFIED),
             }
+            pars_vacancy_data = self._sanitize_vacancy(pars_vacancy_data)
             logger.info(
                 "✅ Вакансия trudvsem.ru распарсена. ID: %s:\n%s",
                 vacancy_id,
@@ -172,6 +173,7 @@ class VacanciesParsingService:
                 "category": category,
                 "social_protected": self.SOCIAL_PROTECTED,
             }
+            parsed_vacancy = self._sanitize_vacancy(parsed_vacancy)
             logger.info(
                 "✅ Вакансия hh.ru распарсена. ID: %s:\n%s",
                 vacancy_id,
@@ -242,7 +244,7 @@ class VacanciesParsingService:
                 employer_name = vacancy.get("company", {}).get("name")
 
                 parsed_vacancies.append(
-                {
+                self._sanitize_vacancy({
                     "vacancy_id": str(vacancy_id) if vacancy_id is not None else self.DEFAULT_NOT_SPECIFIED,
                     "location": location,
                     "vacancy_name": vacancy.get("job-name") or self.DEFAULT_NOT_SPECIFIED,
@@ -264,7 +266,7 @@ class VacanciesParsingService:
                     "requirements": vacancy.get("requirements", self.DEFAULT_NOT_SPECIFIED) or self.DEFAULT_NOT_SPECIFIED,
                     "category": category,
                     "social_protected": vacancy.get("social_protected", self.DEFAULT_NOT_SPECIFIED),
-                }
+                })
             )
             
             except Exception as error:
@@ -335,10 +337,10 @@ class VacanciesParsingService:
                 contacts = vacancy.get("contacts") or {}
                 employer_email = contacts.get("email") or self.DEFAULT_EMAIL
                 parsed_vacancies.append(
-                    {
+                    self._sanitize_vacancy({
                         "vacancy_id": str(vacancy_id) if vacancy_id is not None else self.DEFAULT_NOT_SPECIFIED,
                         "location": location,
-                        "vacancy_name": (vacancy.get("name") or self.DEFAULT_NOT_SPECIFIED).replace("\x00", ""),
+                        "vacancy_name": vacancy.get("name") or self.DEFAULT_NOT_SPECIFIED,
                         "status": "archival" if vacancy.get("archived") else "actual",
                         "description": self._get_many_vacancies_description_hh(vacancy=vacancy) or self.DEFAULT_NOT_SPECIFIED,
                         "salary": self._get_vacancy_salary_hh(vacancy=vacancy),
@@ -359,7 +361,7 @@ class VacanciesParsingService:
                         "requirements": self.DEFAULT_NOT_SPECIFIED,
                         "category": category,
                         "social_protected": self.SOCIAL_PROTECTED,
-                    }
+                    })
                 )
             except Exception as error:
                 logger.exception(
@@ -381,6 +383,15 @@ class VacanciesParsingService:
         )
         return parsed_vacancies
     
+    @staticmethod
+    def _sanitize_vacancy(vacancy: dict) -> dict:
+        """Очищает строковые поля вакансии от символов, недопустимых в PostgreSQL."""
+        return {
+            key: value.replace("\x00", "").replace("\xa0", " ")
+            if isinstance(value, str) else value
+            for key, value in vacancy.items()
+        }
+
     def _get_vacancy_duty_tv(self, vacancy: dict) -> str:
         """Извлекает и очищает описание должностных обязанностей из данных Trudvsem."""
         duty_raw = vacancy.get("duty")
@@ -389,7 +400,6 @@ class VacanciesParsingService:
                 re.sub(r"<[^>]+>", "", duty_raw, flags=re.S)
                 .replace("&nbsp;", "")
                 .replace("&nbsp", "")
-                .replace("\x00", "")
             )
         else:
             duty = self.DEFAULT_DUTY
@@ -476,7 +486,7 @@ class VacanciesParsingService:
             else vacancy.get("area", {}).get("name", location)
         ) or self.DEFAULT_NOT_SPECIFIED
 
-        return employer_location.replace("\x00", "")
+        return employer_location
 
     def _get_contact_phone_number_hh(self, vacancy: dict) -> str:
         """Извлекает контактный номер телефона из данных hh.ru."""
@@ -508,4 +518,4 @@ class VacanciesParsingService:
         if snippet.get("requirement"):
             description += "\n\nТребования: " + snippet["requirement"]
 
-        return description.strip().replace("\x00", "")
+        return description.strip()
