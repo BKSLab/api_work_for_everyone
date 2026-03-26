@@ -711,6 +711,24 @@ class VacanciesService:
             parts=split_location, hyphen=hyphen
         )
 
+    @staticmethod
+    def _deduplicate_vacancies(vacancies: list[dict]) -> list[dict]:
+        """Удаляет дубликаты вакансий по паре (vacancy_id, location)."""
+        seen = set()
+        unique = []
+        for v in vacancies:
+            key = (v.get("vacancy_id"), v.get("location"))
+            if key not in seen:
+                seen.add(key)
+                unique.append(v)
+        duplicates_count = len(vacancies) - len(unique)
+        if duplicates_count > 0:
+            logger.warning(
+                "⚠️ Обнаружены дубликаты вакансий: %d шт. Удалены перед сохранением.",
+                duplicates_count,
+            )
+        return unique
+
     # Блок приватных методов для получения вакансий в заданном регионе и локации
     async def _get_vacancies_data_from_apis(self, location: str, region_data: dict) -> dict:
         """Агрегирует данные о вакансиях из всех внешних API, выполняя запросы асинхронно."""
@@ -778,10 +796,11 @@ class VacanciesService:
             vacancies_count_tv = tv_result.get('vacancies_count', 0)
 
         all_vacancies_count = vacancies_count_hh + vacancies_count_tv
+        vacancies = self._deduplicate_vacancies(vacancies)
 
         logger.info(
-            "✅ Сбор вакансий завершён. hh.ru: %d, trudvsem.ru: %d. Итого: %s",
-            vacancies_count_hh, vacancies_count_tv, all_vacancies_count
+            "✅ Сбор вакансий завершён. hh.ru: %d, trudvsem.ru: %d. Итого: %s (уникальных: %d)",
+            vacancies_count_hh, vacancies_count_tv, all_vacancies_count, len(vacancies)
         )
 
         return {
