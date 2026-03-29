@@ -1,0 +1,434 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content %}
+
+{# ══════════════════════════════════════════
+   СЕКЦИЯ 1: API KEYS
+══════════════════════════════════════════ #}
+<div class="col-12">
+  <h4 style="font-size:15px; font-weight:700; color:var(--foreground);
+             margin:0; padding-left:0.85rem;
+             border-left:3px solid var(--accent); line-height:1.3;">
+    API Keys
+    <span style="font-size:12px; font-weight:400; color:var(--muted); margin-left:0.5rem;">
+      — доступ к сервису
+    </span>
+  </h4>
+</div>
+
+<div class="col-12">
+  <div class="card" style="
+    background: radial-gradient(circle at top left, rgba(245,184,0,0.07), transparent 50%), var(--surface);
+    border: 1px solid rgba(255,255,255,0.12);
+  ">
+    <div class="card-body" style="padding: 2rem;">
+      <p style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:0.5rem;">
+        Всего выдано ключей
+      </p>
+      <p style="font-size:3rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:0;">
+        {{ stats.total_keys }}
+      </p>
+      <hr style="border-top: 2px solid var(--accent); margin-top:1.25rem; margin-bottom:0;">
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-md-4">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:#4ADE80; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Активных ключей</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:#4ADE80; margin:0;">
+        {{ stats.active_keys }}
+      </p>
+      {% if stats.total_keys > 0 %}
+      <p style="font-size:12px; color:var(--muted); margin-top:0.25rem; margin-bottom:0;">
+        {{ "%.0f"|format(stats.active_keys / stats.total_keys * 100) }}% от общего числа
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-md-4">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:#F87171; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Деактивированных</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:#F87171; margin:0;">
+        {{ stats.inactive_keys }}
+      </p>
+      {% if stats.total_keys > 0 %}
+      <p style="font-size:12px; color:var(--muted); margin-top:0.25rem; margin-bottom:0;">
+        {{ "%.0f"|format(stats.inactive_keys / stats.total_keys * 100) }}% от общего числа
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-md-4">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:var(--accent); opacity:0.5; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Выдано за 30 дней</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--foreground); margin:0;">
+        {{ stats.keys_last_30d }}
+      </p>
+    </div>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════
+   СЕКЦИЯ 2: ПОИСК ВАКАНСИЙ
+══════════════════════════════════════════ #}
+<div class="col-12" style="margin-top:1.5rem;">
+  <h4 style="font-size:15px; font-weight:700; color:var(--foreground);
+             margin:0; padding-left:0.85rem;
+             border-left:3px solid var(--accent); line-height:1.3;">
+    Поиск вакансий
+    <span style="font-size:12px; font-weight:400; color:var(--muted); margin-left:0.5rem;">
+      — запросы к hh.ru и trudvsem.ru
+    </span>
+  </h4>
+</div>
+
+<div class="col-12">
+  <div class="card" style="
+    background: radial-gradient(circle at top left, rgba(245,184,0,0.07), transparent 50%), var(--surface);
+    border: 1px solid rgba(255,255,255,0.12);
+  ">
+    <div class="card-body" style="padding:2rem;">
+      <p style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:0.5rem;">
+        Всего поисковых запросов
+      </p>
+      <p style="font-size:3rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:0;">
+        {{ stats.searches_total }}
+      </p>
+      <hr style="border-top: 2px solid var(--accent); margin-top:1.25rem; margin-bottom:0;">
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:var(--accent); flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Поисков сегодня</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--accent); margin:0;">
+        {{ stats.searches_today }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:var(--accent); opacity:0.5; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Поисков за 7 дней</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--foreground); margin:0;">
+        {{ stats.searches_week }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:#F87171; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Ошибок hh.ru</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:#F87171; margin:0;">
+        {{ stats.errors_hh }}
+      </p>
+      {% if stats.searches_total > 0 %}
+      <p style="font-size:12px; color:var(--muted); margin-top:0.25rem; margin-bottom:0;">
+        {{ "%.0f"|format(stats.errors_hh / stats.searches_total * 100) }}% от поисков
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:#F87171; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Ошибок trudvsem.ru</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:#F87171; margin:0;">
+        {{ stats.errors_tv }}
+      </p>
+      {% if stats.searches_total > 0 %}
+      <p style="font-size:12px; color:var(--muted); margin-top:0.25rem; margin-bottom:0;">
+        {{ "%.0f"|format(stats.errors_tv / stats.searches_total * 100) }}% от поисков
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if stats.top_locations %}
+<div class="col-12">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <p style="font-size:13px; font-weight:600; color:var(--foreground); margin-bottom:1rem;">
+        Топ-5 городов по числу поисков
+      </p>
+      {% for item in stats.top_locations %}
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  padding:0.5rem 0;
+                  {% if not loop.last %}border-bottom:1px solid rgba(255,255,255,0.06);{% endif %}">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%;
+                       background:var(--accent); opacity:{{ 1 - loop.index0 * 0.15 }};"></span>
+          <span style="font-size:14px; color:var(--foreground);">{{ item.location }}</span>
+        </div>
+        <span style="font-size:14px; font-weight:700; color:var(--accent);">{{ item.cnt }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════
+   СЕКЦИЯ 3: AI-АССИСТЕНТ
+══════════════════════════════════════════ #}
+<div class="col-12" style="margin-top:1.5rem;">
+  <h4 style="font-size:15px; font-weight:700; color:var(--foreground);
+             margin:0; padding-left:0.85rem;
+             border-left:3px solid var(--accent); line-height:1.3;">
+    AI-ассистент Вера
+    <span style="font-size:12px; font-weight:400; color:var(--muted); margin-left:0.5rem;">
+      — письма и рекомендации по резюме
+    </span>
+  </h4>
+</div>
+
+<div class="col-12">
+  <div class="card" style="
+    background: radial-gradient(circle at top left, rgba(245,184,0,0.07), transparent 50%), var(--surface);
+    border: 1px solid rgba(255,255,255,0.12);
+  ">
+    <div class="card-body" style="padding:2rem;">
+      <p style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:0.5rem;">
+        Всего сессий с ассистентом
+      </p>
+      <p style="font-size:3rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:0;">
+        {{ stats.sessions_total }}
+      </p>
+      <hr style="border-top: 2px solid var(--accent); margin-top:1.25rem; margin-bottom:0;">
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:var(--accent); flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Сессий сегодня</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--accent); margin:0;">
+        {{ stats.sessions_today }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:var(--accent); opacity:0.5; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Сессий за 7 дней</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--foreground); margin:0;">
+        {{ stats.sessions_week }}
+      </p>
+    </div>
+  </div>
+</div>
+
+{% if stats.sessions_by_type %}
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <p style="font-size:13px; font-weight:600; color:var(--foreground); margin-bottom:1rem;">
+        Разбивка по типу сессии
+      </p>
+      {% for item in stats.sessions_by_type %}
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  padding:0.45rem 0;
+                  {% if not loop.last %}border-bottom:1px solid rgba(255,255,255,0.06);{% endif %}">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                       background:{{ item.color }}; flex-shrink:0;"></span>
+          <span style="font-size:13px; color:var(--foreground);">{{ item.label }}</span>
+        </div>
+        <span style="font-size:14px; font-weight:700; color:var(--foreground);">{{ item.cnt }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if stats.sessions_by_model %}
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <p style="font-size:13px; font-weight:600; color:var(--foreground); margin-bottom:1rem;">
+        Использованные модели LLM
+      </p>
+      {% for item in stats.sessions_by_model %}
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  padding:0.45rem 0;
+                  {% if not loop.last %}border-bottom:1px solid rgba(255,255,255,0.06);{% endif %}">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                       background:var(--muted); flex-shrink:0;"></span>
+          <span style="font-size:13px; color:var(--foreground);">{{ item.model }}</span>
+        </div>
+        <span style="font-size:14px; font-weight:700; color:var(--foreground);">{{ item.cnt }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════
+   СЕКЦИЯ 4: ИЗБРАННОЕ
+══════════════════════════════════════════ #}
+<div class="col-12" style="margin-top:1.5rem;">
+  <h4 style="font-size:15px; font-weight:700; color:var(--foreground);
+             margin:0; padding-left:0.85rem;
+             border-left:3px solid var(--accent); line-height:1.3;">
+    Избранные вакансии
+    <span style="font-size:12px; font-weight:400; color:var(--muted); margin-left:0.5rem;">
+      — что сохраняют пользователи
+    </span>
+  </h4>
+</div>
+
+<div class="col-12">
+  <div class="card" style="
+    background: radial-gradient(circle at top left, rgba(245,184,0,0.07), transparent 50%), var(--surface);
+    border: 1px solid rgba(255,255,255,0.12);
+  ">
+    <div class="card-body" style="padding:2rem;">
+      <p style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:0.5rem;">
+        Всего вакансий в избранном
+      </p>
+      <p style="font-size:3rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:0;">
+        {{ stats.favorites_total }}
+      </p>
+      <hr style="border-top: 2px solid var(--accent); margin-top:1.25rem; margin-bottom:0;">
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-md-4">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:var(--accent); flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Уникальных пользователей</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--foreground); margin:0;">
+        {{ stats.unique_users }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-md-4">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:#EF4444; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">С hh.ru</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--foreground); margin:0;">
+        {{ stats.favs_hh }}
+      </p>
+      {% if stats.favorites_total > 0 %}
+      <p style="font-size:12px; color:var(--muted); margin-top:0.25rem; margin-bottom:0;">
+        {{ "%.0f"|format(stats.favs_hh / stats.favorites_total * 100) }}% от общего числа
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-md-4">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:#3B82F6; flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">С trudvsem.ru</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--foreground); margin:0;">
+        {{ stats.favs_tv }}
+      </p>
+      {% if stats.favorites_total > 0 %}
+      <p style="font-size:12px; color:var(--muted); margin-top:0.25rem; margin-bottom:0;">
+        {{ "%.0f"|format(stats.favs_tv / stats.favorites_total * 100) }}% от общего числа
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="col-12 col-sm-6">
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%;
+                     background:var(--muted); flex-shrink:0;"></span>
+        <p style="font-size:13px; font-weight:600; color:var(--foreground); margin:0;">Вакансий больше нет (not_found)</p>
+      </div>
+      <p style="font-size:2rem; font-weight:700; color:var(--muted); margin:0;">
+        {{ stats.favs_not_found }}
+      </p>
+      {% if stats.favorites_total > 0 %}
+      <p style="font-size:12px; color:var(--muted); margin-top:0.25rem; margin-bottom:0;">
+        {{ "%.0f"|format(stats.favs_not_found / stats.favorites_total * 100) }}% от общего числа
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -7,6 +7,7 @@ from dependencies.clients import HHClientDep, LlmClientDep, TVClientDep
 from dependencies.repositories import (
     ApiKeyRepositoryDep,
     AssistantSessionRepositoryDep,
+    FavoriteEventRepositoryDep,
     FavoritesRepositoryDep,
     RegionRepositoryDep,
     SearchEventRepositoryDep,
@@ -59,6 +60,7 @@ async def get_vacancies_service(
     region_service: RegionServiceDep,
     vacancies_repository: VacanciesRepositoryDep,
     favorites_repository: FavoritesRepositoryDep,
+    favorite_event_repository: FavoriteEventRepositoryDep,
     assistant_session_repository: AssistantSessionRepositoryDep,
     search_event_repository: SearchEventRepositoryDep,
     hh_client_api: HHClientDep,
@@ -71,6 +73,7 @@ async def get_vacancies_service(
         region_service=region_service,
         vacancies_repository=vacancies_repository,
         favorites_repository=favorites_repository,
+        favorite_event_repository=favorite_event_repository,
         assistant_session_repository=assistant_session_repository,
         search_event_repository=search_event_repository,
         hh_client_api=hh_client_api,

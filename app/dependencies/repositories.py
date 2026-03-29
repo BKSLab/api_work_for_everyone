@@ -5,6 +5,7 @@ from fastapi import Depends
 from dependencies.db_session import DbSessionDep
 from repositories.api_keys import ApiKeyRepository
 from repositories.assistant_session import AssistantSessionRepository
+from repositories.favorite_event import FavoriteEventRepository
 from repositories.favorites import FavoritesRepository
 from repositories.regions import RegionRepository
 from repositories.search_event import SearchEventRepository
@@ -60,4 +61,13 @@ def get_search_event_repository(session: DbSessionDep) -> SearchEventRepository:
 
 SearchEventRepositoryDep = Annotated[
     SearchEventRepository, Depends(get_search_event_repository)
+]
+
+
+def get_favorite_event_repository(session: DbSessionDep) -> FavoriteEventRepository:
+    return FavoriteEventRepository(session)
+
+
+FavoriteEventRepositoryDep = Annotated[
+    FavoriteEventRepository, Depends(get_favorite_event_repository)
 ]

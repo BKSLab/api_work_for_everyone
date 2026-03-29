@@ -1,4 +1,8 @@
-from sqlalchemy import UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func
 
 from .base_vacancy import BaseVacancy
 
@@ -9,6 +13,13 @@ class Vacancies(BaseVacancy):
     """
 
     __tablename__ = 'vacancies'
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        comment='Дата последнего обновления списка вакансий по локации'
+    )
 
     __table_args__ = (
         UniqueConstraint(

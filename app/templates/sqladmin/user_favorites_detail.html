@@ -1,0 +1,129 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content %}
+
+{# Навигация назад #}
+<div class="col-12">
+  <div style="margin-bottom:0.5rem;">
+    <a href="?" style="font-size:12px; color:var(--muted); text-decoration:none;"
+       onmouseover="this.style.color='var(--accent)'"
+       onmouseout="this.style.color='var(--muted)'">
+      ← Все пользователи
+    </a>
+  </div>
+</div>
+
+{# Заголовок с user_id и количеством #}
+<div class="col-12">
+  <div class="card" style="
+    background: radial-gradient(circle at top left, rgba(245,184,0,0.07), transparent 50%), var(--surface);
+    border: 1px solid rgba(255,255,255,0.12);
+  ">
+    <div class="card-body" style="padding:2rem;">
+      <p style="font-size:11px; font-weight:600; text-transform:uppercase;
+                letter-spacing:0.1em; color:var(--muted); margin-bottom:0.5rem;">
+        Вакансий в избранном
+      </p>
+      <p style="font-size:3rem; font-weight:800; color:var(--accent); line-height:1; margin-bottom:0.75rem;">
+        {{ vacancies | length }}
+      </p>
+      <p style="font-size:12px; color:var(--muted); margin:0; font-family:monospace;">
+        {{ user_id }}
+      </p>
+      <hr style="border-top: 2px solid var(--accent); margin-top:1.25rem; margin-bottom:0;">
+    </div>
+  </div>
+</div>
+
+{# Таблица вакансий #}
+<div class="col-12">
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+            <th style="padding:0.85rem 1.5rem; text-align:left; font-size:11px; font-weight:600;
+                       text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);">
+              Вакансия
+            </th>
+            <th style="padding:0.85rem 1.5rem; text-align:left; font-size:11px; font-weight:600;
+                       text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);">
+              Работодатель
+            </th>
+            <th style="padding:0.85rem 1.5rem; text-align:left; font-size:11px; font-weight:600;
+                       text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);">
+              Источник
+            </th>
+            <th style="padding:0.85rem 1.5rem; text-align:left; font-size:11px; font-weight:600;
+                       text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);">
+              Город
+            </th>
+            <th style="padding:0.85rem 1.5rem; text-align:left; font-size:11px; font-weight:600;
+                       text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);">
+              Зарплата
+            </th>
+            <th style="padding:0.85rem 1.5rem; text-align:center; font-size:11px; font-weight:600;
+                       text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);">
+              Статус
+            </th>
+            <th style="padding:0.85rem 1.5rem; text-align:left; font-size:11px; font-weight:600;
+                       text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);">
+              Обновлено
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in vacancies %}
+          {% set source_color = "#EF4444" if v.vacancy_source == "hh.ru" else "#3B82F6" %}
+          {% set status_color = "#6B7280" if v.status == "not_found" else "#22C55E" %}
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06);
+                     transition: background 0.15s;"
+              onmouseover="this.style.background='rgba(255,255,255,0.03)'"
+              onmouseout="this.style.background='transparent'">
+            <td style="padding:0.85rem 1.5rem; font-size:13px; color:var(--foreground);
+                       max-width:280px; word-break:break-word;">
+              {{ v.vacancy_name or '—' }}
+            </td>
+            <td style="padding:0.85rem 1.5rem; font-size:13px; color:var(--muted);
+                       max-width:200px; word-break:break-word;">
+              {{ v.employer_name or '—' }}
+            </td>
+            <td style="padding:0.85rem 1.5rem;">
+              {% if v.vacancy_source %}
+              <span style="background:{{ source_color }};color:#fff;padding:2px 8px;
+                           border-radius:4px;font-size:0.8em;font-weight:600;">
+                {{ v.vacancy_source }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+            <td style="padding:0.85rem 1.5rem; font-size:13px; color:var(--muted);">
+              {{ v.location or '—' }}
+            </td>
+            <td style="padding:0.85rem 1.5rem; font-size:13px; color:var(--muted);">
+              {{ v.salary or '—' }}
+            </td>
+            <td style="padding:0.85rem 1.5rem; text-align:center;">
+              <span style="background:{{ status_color }};color:{% if v.status == 'not_found' %}#fff{% else %}#000{% endif %};
+                           padding:2px 8px;border-radius:4px;font-size:0.8em;font-weight:600;">
+                {{ v.status or 'actual' }}
+              </span>
+            </td>
+            <td style="padding:0.85rem 1.5rem; font-size:12px; color:var(--muted); white-space:nowrap;">
+              {{ v.updated_at.strftime('%d.%m.%Y %H:%M') if v.updated_at else '—' }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" style="padding:2rem 1.5rem; text-align:center;
+                                   font-size:13px; color:var(--muted);">
+              Нет вакансий в избранном
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

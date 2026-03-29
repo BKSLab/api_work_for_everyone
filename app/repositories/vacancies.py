@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from sqlalchemy import Result, delete, func, insert, or_, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -182,4 +183,15 @@ class VacanciesRepository:
         except (SQLAlchemyError, Exception) as error:
             raise VacanciesRepositoryError(
                 error_details=f"Ошибка при подсчёте вакансий по источникам. Населённый пункт: {location}."
+            ) from error
+
+    async def get_last_updated_at(self, location: str) -> datetime | None:
+        """Возвращает время последнего обновления вакансий по локации."""
+        try:
+            stmt = select(func.max(Vacancies.updated_at)).where(Vacancies.location == location)
+            result: Result = await self.db_session.execute(statement=stmt)
+            return result.scalar_one_or_none()
+        except (SQLAlchemyError, Exception) as error:
+            raise VacanciesRepositoryError(
+                error_details=f"Ошибка при получении времени обновления вакансий. Населённый пункт: {location}."
             ) from error

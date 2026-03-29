@@ -20,6 +20,7 @@ from exceptions.vacancies import (
     VacancyNotFoundError,
 )
 from repositories.assistant_session import AssistantSessionRepository
+from repositories.favorite_event import FavoriteEventRepository
 from repositories.favorites import FavoritesRepository
 from repositories.search_event import SearchEventRepository
 from repositories.vacancies import VacanciesRepository
@@ -42,12 +43,14 @@ class VacanciesService:
     FLAG_VACANCY_NOT_FOUND = "not_found"
     SEMAPHORE_LIMIT = 5
     FAVORITES_TTL_HOURS = 24
+    VACANCIES_TTL_HOURS = 3
 
     def __init__(
         self,
         region_service: RegionService,
         vacancies_repository: VacanciesRepository,
         favorites_repository: FavoritesRepository,
+        favorite_event_repository: FavoriteEventRepository,
         assistant_session_repository: AssistantSessionRepository,
         search_event_repository: SearchEventRepository,
         hh_client_api: HHClient,
@@ -58,6 +61,7 @@ class VacanciesService:
         self.region_service = region_service
         self.vacancies_repository = vacancies_repository
         self.favorites_repository = favorites_repository
+        self.favorite_event_repository = favorite_event_repository
         self.assistant_session_repository = assistant_session_repository
         self.search_event_repository = search_event_repository
         self.hh_client_api = hh_client_api
@@ -101,16 +105,16 @@ class VacanciesService:
         """
         Инициирует поиск, сбор, сохранение и возврат вакансий.
 
-        Собирает вакансии из внешних API, сохраняет их в базу данных,
-        предварительно удалив старые записи для данной локации, и возвращает
-        собранные данные вместе со статистикой.
+        Если данные по локации свежие (< VACANCIES_TTL_HOURS), возвращает счётчики
+        из БД без обращения к внешним API. Иначе — выполняет полный сбор из источников,
+        сохраняет в БД и возвращает результат.
 
         Args:
             location: Нормализованное наименование населенного пункта.
             region_data: Словарь с данными о регионе.
 
         Returns:
-            Словарь с результатами поиска, включая списки вакансий и информацию об ошибках.
+            Словарь с результатами поиска, включая счётчики вакансий и флаги ошибок.
 
         Raises:
             VacanciesServiceError: Если не удалось получить данные ни из одного источника.
@@ -121,10 +125,51 @@ class VacanciesService:
         )
 
         region_name = region_data.get("name")
+
+        # TTL-проверка: если данные свежие — отдаём из БД без вызова API
+        last_updated_at = await self.vacancies_repository.get_last_updated_at(location=location)
+        if last_updated_at is not None:
+            ttl_threshold = datetime.now(timezone.utc) - timedelta(hours=self.VACANCIES_TTL_HOURS)
+            if last_updated_at >= ttl_threshold:
+                logger.info(
+                    "✅ Вакансии по локации '%s' свежие (<%dч). Возвращаем из БД.",
+                    location, self.VACANCIES_TTL_HOURS
+                )
+                total, counts_by_source = await asyncio.gather(
+                    self.vacancies_repository.get_count_vacancies(location=location),
+                    self.vacancies_repository.get_count_vacancies_by_source(location=location),
+                )
+                await self.search_event_repository.save_event({
+                    "location": location,
+                    "region_name": region_name,
+                    "region_code": region_data.get("code_tv", ""),
+                    "count_hh": counts_by_source.get("hh.ru", 0),
+                    "count_tv": counts_by_source.get("trudvsem.ru", 0),
+                    "total_count": total,
+                    "error_hh": False,
+                    "error_tv": False,
+                })
+                return {
+                    "all_vacancies_count": total,
+                    "vacancies_count_hh": counts_by_source.get("hh.ru", 0),
+                    "vacancies_count_tv": counts_by_source.get("trudvsem.ru", 0),
+                    "error_request_hh": False,
+                    "error_request_tv": False,
+                    "error_details_hh": "",
+                    "error_details_tv": "",
+                    "location": location,
+                    "region_name": region_name,
+                }
+
+        # Данные устарели или отсутствуют — полный сбор из внешних API
+        logger.info(
+            "🔄 Вакансии по локации '%s' устарели или отсутствуют. Запускаем сбор из источников.",
+            location
+        )
         api_vacancies_response = await self._get_vacancies_data_from_apis(
             location=location, region_data=region_data
         )
-        
+
         error_request_hh = api_vacancies_response.get("error_request_hh")
         error_request_tv = api_vacancies_response.get("error_request_tv")
         all_vacancies_count = api_vacancies_response.get("all_vacancies_count")
@@ -158,7 +203,7 @@ class VacanciesService:
         )
 
         api_vacancies_response.update({"location": location, "region_name": region_name})
-    
+
         return api_vacancies_response
 
     async def get_vacancies_by_location(
@@ -324,6 +369,19 @@ class VacanciesService:
         await self.favorites_repository.add_vacancy(
             favorite_data={"user_id": user_id, **vacancy_dict}
         )
+
+        await self.favorite_event_repository.save_event({
+            "user_id": user_id,
+            "vacancy_id": vacancy_id,
+            "action": "add",
+            "vacancy_name": vacancy_dict.get("vacancy_name"),
+            "employer_name": vacancy_dict.get("employer_name"),
+            "vacancy_source": vacancy_dict.get("vacancy_source"),
+            "location": vacancy_dict.get("location"),
+            "category": vacancy_dict.get("category"),
+            "salary": vacancy_dict.get("salary"),
+            "description": vacancy_dict.get("description"),
+        })
     
     async def delete_vacancy_from_favorites(self, vacancy_id: str, user_id: str) -> None:
         """
@@ -340,6 +398,9 @@ class VacanciesService:
             "🗑️ Запрос на удаление вакансии из избранного. ID вакансии: %s, ID пользователя: %s",
             vacancy_id, user_id
         )
+        favorite = await self.favorites_repository.get_vacancy_by_id(
+            vacancy_id=vacancy_id, user_id=user_id
+        )
         delete_result = await self.favorites_repository.delete_vacancy(
             user_id=user_id, vacancy_id=vacancy_id,
         )
@@ -348,6 +409,20 @@ class VacanciesService:
                 vacancy_id=vacancy_id,
                 error_details="Указанная вакансия не найдена в избранном пользователя."
             )
+
+        if favorite:
+            await self.favorite_event_repository.save_event({
+                "user_id": user_id,
+                "vacancy_id": vacancy_id,
+                "action": "remove",
+                "vacancy_name": favorite.vacancy_name,
+                "employer_name": favorite.employer_name,
+                "vacancy_source": favorite.vacancy_source,
+                "location": favorite.location,
+                "category": favorite.category,
+                "salary": favorite.salary,
+                "description": favorite.description,
+            })
 
     async def get_user_favorites(self, user_id: str, page: int, page_size: int) -> FavoriteVacanciesListSchema:
         """
@@ -797,10 +872,11 @@ class VacanciesService:
 
         all_vacancies_count = vacancies_count_hh + vacancies_count_tv
         vacancies = self._deduplicate_vacancies(vacancies)
-
+        all_unique_vacancies_count = len(vacancies)
+        
         logger.info(
             "✅ Сбор вакансий завершён. hh.ru: %d, trudvsem.ru: %d. Итого: %s (уникальных: %d)",
-            vacancies_count_hh, vacancies_count_tv, all_vacancies_count, len(vacancies)
+            vacancies_count_hh, vacancies_count_tv, all_vacancies_count, all_unique_vacancies_count
         )
 
         return {
@@ -809,7 +885,7 @@ class VacanciesService:
             "error_request_tv": error_request_tv,
             "error_details_hh": error_details_hh,
             "error_details_tv": error_details_tv,
-            "all_vacancies_count": all_vacancies_count,
+            "all_vacancies_count": all_unique_vacancies_count,
             "vacancies_count_hh": vacancies_count_hh,
             "vacancies_count_tv": vacancies_count_tv,
         }
