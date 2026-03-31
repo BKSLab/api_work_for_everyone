@@ -392,6 +392,50 @@ class VacanciesParsingService:
             for key, value in vacancy.items()
         }
 
+    @staticmethod
+    def _split_into_paragraphs(text: str, max_paragraph_length: int = 350) -> str:
+        """Разбивает длинный текст на абзацы по границам предложений.
+
+        Существующие переносы строк сохраняются. Длинные непрерывные блоки
+        делятся на абзацы: предложения накапливаются, пока их суммарная длина
+        не превысит max_paragraph_length, затем начинается новый абзац.
+        """
+        if not text or not text.strip():
+            return text
+
+        blocks = re.split(r'\n+', text)
+        result_blocks = []
+
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            if len(block) <= max_paragraph_length:
+                result_blocks.append(block)
+                continue
+
+            sentences = re.split(r'(?<=[.!?])\s+(?=[А-ЯЁA-Z«"(])', block)
+
+            paragraphs = []
+            current: list[str] = []
+            current_length = 0
+
+            for sentence in sentences:
+                if current and current_length + len(sentence) > max_paragraph_length:
+                    paragraphs.append(' '.join(current))
+                    current = [sentence]
+                    current_length = len(sentence)
+                else:
+                    current.append(sentence)
+                    current_length += len(sentence)
+
+            if current:
+                paragraphs.append(' '.join(current))
+
+            result_blocks.extend(paragraphs)
+
+        return '\n\n'.join(result_blocks).strip()
+
     def _get_vacancy_duty_tv(self, vacancy: dict) -> str:
         """Извлекает и очищает описание должностных обязанностей из данных Trudvsem."""
         duty_raw = vacancy.get("duty")
@@ -400,11 +444,12 @@ class VacanciesParsingService:
                 re.sub(r"<[^>]+>", "", duty_raw, flags=re.S)
                 .replace("&nbsp;", "")
                 .replace("&nbsp", "")
+                .strip()
             )
-        else:
-            duty = self.DEFAULT_DUTY
-
-        return duty
+            if not duty:
+                return self.DEFAULT_DUTY
+            return self._split_into_paragraphs(duty)
+        return self.DEFAULT_DUTY
 
     def _get_contact_phone_number_tv(self, vacancy: dict) -> str:
         """Извлекает контактный номер телефона из данных Trudvsem."""
@@ -472,11 +517,10 @@ class VacanciesParsingService:
     def _get_vacancy_description_hh(self, vacancy: dict) -> str:
         """Извлекает и очищает описание вакансии из детальных данных hh.ru."""
         description_raw = vacancy.get("description", "") or ""
-        description = re.sub(
-            r"<[^>]+>", "", description_raw, flags=re.S
-        ) or self.DEFAULT_NOT_SPECIFIED
-
-        return description
+        description = re.sub(r"<[^>]+>", "", description_raw, flags=re.S).strip()
+        if not description:
+            return self.DEFAULT_NOT_SPECIFIED
+        return self._split_into_paragraphs(description)
 
     def _get_employer_location_hh(self, vacancy: dict, location: str = "") ->str:
         """Извлекает местоположение работодателя из данных hh.ru."""

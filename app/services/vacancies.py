@@ -872,11 +872,18 @@ class VacanciesService:
 
         all_vacancies_count = vacancies_count_hh + vacancies_count_tv
         vacancies = self._deduplicate_vacancies(vacancies)
-        all_unique_vacancies_count = len(vacancies)
-        
+
+        counts_by_source: dict[str, int] = {}
+        for v in vacancies:
+            source = v.get("vacancy_source", "")
+            counts_by_source[source] = counts_by_source.get(source, 0) + 1
+
+        vacancies_count_hh = counts_by_source.get("hh.ru", 0)
+        vacancies_count_tv = counts_by_source.get("trudvsem.ru", 0)
+
         logger.info(
             "✅ Сбор вакансий завершён. hh.ru: %d, trudvsem.ru: %d. Итого: %s (уникальных: %d)",
-            vacancies_count_hh, vacancies_count_tv, all_vacancies_count, all_unique_vacancies_count
+            vacancies_count_hh, vacancies_count_tv, all_vacancies_count, len(vacancies)
         )
 
         return {
@@ -885,7 +892,7 @@ class VacanciesService:
             "error_request_tv": error_request_tv,
             "error_details_hh": error_details_hh,
             "error_details_tv": error_details_tv,
-            "all_vacancies_count": all_unique_vacancies_count,
+            "all_vacancies_count": len(vacancies),
             "vacancies_count_hh": vacancies_count_hh,
             "vacancies_count_tv": vacancies_count_tv,
         }
