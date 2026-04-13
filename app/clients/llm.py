@@ -36,7 +36,7 @@ class LlmClient:
         self.headers = headers
         self.temperature = temperature
         self.stream = stream
-        self.timeout: int = 180
+        self.timeout: int = 90
         self.delay: float = 1.0
         self.max_delay: float = 30.0
         self.retries: int = 3                                                                
