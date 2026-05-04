@@ -43,7 +43,7 @@ class VacanciesService:
     FLAG_VACANCY_NOT_FOUND = "not_found"
     SEMAPHORE_LIMIT = 5
     FAVORITES_TTL_HOURS = 24
-    VACANCIES_TTL_HOURS = 3
+    VACANCIES_TTL_HOURS = 1
 
     def __init__(
         self,
@@ -101,6 +101,38 @@ class VacanciesService:
         logger.info("✅ Данные после валидации: %s", pformat(validated_data))
         return validated_data
 
+    async def _is_vacancies_cache_valid(self, location: str) -> bool:
+        """Возвращает True, если кэш вакансий по локации актуален и пригоден для использования.
+
+        Кэш считается валидным, если данные моложе VACANCIES_TTL_HOURS
+        и предыдущий запрос завершился без ошибок по всем источникам.
+        """
+        last_updated_at = await self.vacancies_repository.get_last_updated_at(location=location)
+        if last_updated_at is None:
+            logger.info("🔄 Вакансии по локации '%s' отсутствуют в БД. Запускаем сбор.", location)
+            return False
+
+        ttl_threshold = datetime.now(timezone.utc) - timedelta(hours=self.VACANCIES_TTL_HOURS)
+        if last_updated_at < ttl_threshold:
+            logger.info(
+                "🔄 Вакансии по локации '%s' устарели (обновлено: %s, TTL: %dч). Запускаем сбор.",
+                location, last_updated_at.strftime("%H:%M:%S %d.%m.%Y"), self.VACANCIES_TTL_HOURS,
+            )
+            return False
+
+        error_hh_last, error_tv_last = await self.search_event_repository.get_last_error_flags(
+            location=location
+        )
+        if error_hh_last or error_tv_last:
+            logger.info(
+                "⚠️ Данные по локации '%s' свежие, но предыдущий запрос завершился с ошибками "
+                "(hh.ru: %s, trudvsem.ru: %s). Повторяем сбор из источников.",
+                location, error_hh_last, error_tv_last,
+            )
+            return False
+
+        return True
+
     async def get_vacancies_info(self, location: str, region_data: dict) -> dict:
         """
         Инициирует поиск, сбор, сохранение и возврат вакансий.
@@ -126,46 +158,37 @@ class VacanciesService:
 
         region_name = region_data.get("name")
 
-        # TTL-проверка: если данные свежие — отдаём из БД без вызова API
-        last_updated_at = await self.vacancies_repository.get_last_updated_at(location=location)
-        if last_updated_at is not None:
-            ttl_threshold = datetime.now(timezone.utc) - timedelta(hours=self.VACANCIES_TTL_HOURS)
-            if last_updated_at >= ttl_threshold:
-                logger.info(
-                    "✅ Вакансии по локации '%s' свежие (<%dч). Возвращаем из БД.",
-                    location, self.VACANCIES_TTL_HOURS
-                )
-                total, counts_by_source = await asyncio.gather(
-                    self.vacancies_repository.get_count_vacancies(location=location),
-                    self.vacancies_repository.get_count_vacancies_by_source(location=location),
-                )
-                await self.search_event_repository.save_event({
-                    "location": location,
-                    "region_name": region_name,
-                    "region_code": region_data.get("code_tv", ""),
-                    "count_hh": counts_by_source.get("hh.ru", 0),
-                    "count_tv": counts_by_source.get("trudvsem.ru", 0),
-                    "total_count": total,
-                    "error_hh": False,
-                    "error_tv": False,
-                })
-                return {
-                    "all_vacancies_count": total,
-                    "vacancies_count_hh": counts_by_source.get("hh.ru", 0),
-                    "vacancies_count_tv": counts_by_source.get("trudvsem.ru", 0),
-                    "error_request_hh": False,
-                    "error_request_tv": False,
-                    "error_details_hh": "",
-                    "error_details_tv": "",
-                    "location": location,
-                    "region_name": region_name,
-                }
+        if await self._is_vacancies_cache_valid(location=location):
+            logger.info(
+                "✅ Вакансии по локации '%s' свежие (<%dч). Возвращаем из БД.",
+                location, self.VACANCIES_TTL_HOURS
+            )
+            total, counts_by_source = await asyncio.gather(
+                self.vacancies_repository.get_count_vacancies(location=location),
+                self.vacancies_repository.get_count_vacancies_by_source(location=location),
+            )
+            await self.search_event_repository.save_event({
+                "location": location,
+                "region_name": region_name,
+                "region_code": region_data.get("code_tv", ""),
+                "count_hh": counts_by_source.get("hh.ru", 0),
+                "count_tv": counts_by_source.get("trudvsem.ru", 0),
+                "total_count": total,
+                "error_hh": False,
+                "error_tv": False,
+            })
+            return {
+                "all_vacancies_count": total,
+                "vacancies_count_hh": counts_by_source.get("hh.ru", 0),
+                "vacancies_count_tv": counts_by_source.get("trudvsem.ru", 0),
+                "error_request_hh": False,
+                "error_request_tv": False,
+                "error_details_hh": "",
+                "error_details_tv": "",
+                "location": location,
+                "region_name": region_name,
+            }
 
-        # Данные устарели или отсутствуют — полный сбор из внешних API
-        logger.info(
-            "🔄 Вакансии по локации '%s' устарели или отсутствуют. Запускаем сбор из источников.",
-            location
-        )
         api_vacancies_response = await self._get_vacancies_data_from_apis(
             location=location, region_data=region_data
         )

@@ -207,7 +207,7 @@ class HHClient:
             "text": location,
             "label": self.SOCIAL_PROTECTED_HH,
         }
-        vacancies_request_result = await self._request_to_api_hh(
+        vacancies_request_result = await self._request_with_retry(
             url=self.VACANCY_URL, params=params
         )
         status = vacancies_request_result.get("status")

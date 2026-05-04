@@ -136,7 +136,7 @@ class TVClient:
 
         request_params = {"social_protected": self.SOCIAL_PROTECTED}
         request_url = self.ENDPOINT_REGION + region_code_tv
-        vacancies_request_result = await self._request_to_api_tv(
+        vacancies_request_result = await self._request_with_retry(
             url=request_url, params=request_params
         )
 

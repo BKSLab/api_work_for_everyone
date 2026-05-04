@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import insert
+from sqlalchemy import insert, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,3 +24,24 @@ class SearchEventRepository:
         except (SQLAlchemyError, Exception) as error:
             await self.db_session.rollback()
             logger.warning("⚠️ Не удалось сохранить событие поиска: %s", error)
+
+    async def get_last_error_flags(self, location: str) -> tuple[bool, bool]:
+        """Возвращает флаги ошибок последнего события поиска по локации.
+
+        При ошибке БД возвращает (False, False), чтобы не блокировать TTL-кэш.
+        """
+        try:
+            stmt = (
+                select(SearchEvent.error_hh, SearchEvent.error_tv)
+                .where(SearchEvent.location == location)
+                .order_by(SearchEvent.created_at.desc())
+                .limit(1)
+            )
+            result = await self.db_session.execute(stmt)
+            row = result.one_or_none()
+            if row is None:
+                return False, False
+            return row.error_hh, row.error_tv
+        except (SQLAlchemyError, Exception) as error:
+            logger.warning("⚠️ Не удалось получить флаги ошибок последнего события поиска: %s", error)
+            return False, False
