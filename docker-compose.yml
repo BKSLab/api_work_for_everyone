@@ -26,6 +26,10 @@ services:
       resources:
         limits:
           memory: 2GB
+    extra_hosts:
+      # Резервный IP api.hh.ru по рекомендации поддержки hh.ru (май 2026).
+      # Основной IP нестабилен — сервер рвёт соединения. Убрать после исправления на стороне hh.ru.
+      - "api.hh.ru:185.129.102.30"
     depends_on:
       - db
 
