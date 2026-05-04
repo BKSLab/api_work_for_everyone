@@ -835,14 +835,14 @@ class VacanciesService:
         if isinstance(hh_result, (VacanciesNotFoundError, HHAPIRequestError, VacancyParseError)):
             logger.error(
                 "❌ Ошибка при получении данных от hh.ru: %s",
-                hh_result, exc_info=True
+                hh_result, exc_info=hh_result
             )
             error_request_hh = True
             error_details_hh = getattr(hh_result, 'detail', str(hh_result))
         elif isinstance(hh_result, Exception):
             logger.error(
                 "❌ Непредвиденная ошибка при получении данных от hh.ru: %s",
-                hh_result, exc_info=True
+                hh_result, exc_info=hh_result
             )
             error_request_hh = True
             error_details_hh = str(hh_result)
@@ -855,14 +855,14 @@ class VacanciesService:
         if isinstance(tv_result, (VacanciesNotFoundError, TVAPIRequestError, VacancyParseError)):
             logger.error(
                 "❌ Ошибка при получении данных от trudvsem.ru: %s",
-                tv_result, exc_info=True
+                tv_result, exc_info=tv_result
             )
             error_request_tv = True
             error_details_tv = getattr(tv_result, 'detail', str(tv_result))
         elif isinstance(tv_result, Exception):
             logger.error(
                 "❌ Непредвиденная ошибка при получении данных от trudvsem.ru: %s",
-                tv_result, exc_info=True
+                tv_result, exc_info=tv_result
             )
             error_request_tv = True
             error_details_tv = str(tv_result)

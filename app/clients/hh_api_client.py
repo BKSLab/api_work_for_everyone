@@ -21,9 +21,12 @@ class HHClient:
     FIRST_ELEMENT: int = 1
     VACANCY_URL: str = "https://api.hh.ru/vacancies/"
 
-    # Ограничение параллельных запросов к HH.ru — API имеет rate limit даже с OAuth-токеном.
-    # 5 одновременных запросов достаточно для типичного числа страниц (до 20).
-    MAX_CONCURRENT_REQUESTS: int = 5
+    # Ограничение параллельных запросов к HH.ru — сервер режет соединения по IP.
+    # 3 одновременных запроса — рабочий предел для серверного IP.
+    MAX_CONCURRENT_REQUESTS: int = 3
+
+    MAX_RETRIES: int = 3
+    RETRY_DELAY: float = 1.5
 
     def __init__(self, httpx_client: httpx.AsyncClient):
         self.httpx_client = httpx_client
@@ -63,8 +66,9 @@ class HHClient:
 
         except httpx.RequestError as error:
             logger.error(
-                "❌ Ошибка сети при запросе к API hh.ru. URL: %s, детали: %s",
-                error.request.url, error,
+                "❌ Ошибка сети при запросе к API hh.ru. URL: %s, тип: %s, детали: %s",
+                error.request.url, type(error).__name__, repr(error),
+                exc_info=True,
             )
             return {"status": False, "search_status": "request_error", "response_data": {}}
 
@@ -126,11 +130,25 @@ class HHClient:
             "label": self.SOCIAL_PROTECTED_HH,
         }
 
+    async def _request_with_retry(self, url: str, params: dict | None = None) -> dict:
+        """Выполняет запрос к API hh.ru с повторами при ошибке."""
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            result = await self._request_to_api_hh(url=url, params=params)
+            if result.get("status"):
+                return result
+            if attempt < self.MAX_RETRIES:
+                logger.warning(
+                    "⚠️ Попытка %d/%d не удалась (hh.ru). Повтор через %.1fс. URL: %s",
+                    attempt, self.MAX_RETRIES, self.RETRY_DELAY, url,
+                )
+                await asyncio.sleep(self.RETRY_DELAY)
+        return result
+
     async def _request_page_with_semaphore(self, region_code_hh: str, location: str, page: int) -> dict:
         """Запрашивает одну страницу вакансий с учётом семафора rate limit."""
         async with self._semaphore:
             params = self._build_page_params(region_code_hh, location, page)
-            return await self._request_to_api_hh(url=self.VACANCY_URL, params=params)
+            return await self._request_with_retry(url=self.VACANCY_URL, params=params)
 
     async def _get_many_vacancies_in_location(
         self,

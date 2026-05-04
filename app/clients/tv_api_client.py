@@ -25,6 +25,9 @@ class TVClient:
         "http://opendata.trudvsem.ru/api/v1/vacancies/vacancy"
     )
 
+    MAX_RETRIES: int = 3
+    RETRY_DELAY: float = 1.5
+
     def __init__(self, httpx_client: httpx.AsyncClient):
         self.httpx_client = httpx_client
 
@@ -51,8 +54,9 @@ class TVClient:
             )
         except httpx.RequestError as error:
             logger.error(
-                "❌ Ошибка сети при запросе к API trudvsem.ru. URL: %s, детали: %s",
-                error.request.url, error,
+                "❌ Ошибка сети при запросе к API trudvsem.ru. URL: %s, тип: %s, детали: %s",
+                error.request.url, type(error).__name__, repr(error),
+                exc_info=True,
             )
         except Exception as error:
             logger.error(
@@ -65,10 +69,24 @@ class TVClient:
         """Возвращает количество страниц при запросе вакансий."""
         return ceil(total_vacancies / self.VACANCIES_PER_ONE_PAGE)
 
+    async def _request_with_retry(self, url: str, params: dict | None = None) -> dict:
+        """Выполняет запрос к API trudvsem.ru с повторами при ошибке."""
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            result = await self._request_to_api_tv(url=url, params=params)
+            if result.get("status"):
+                return result
+            if attempt < self.MAX_RETRIES:
+                logger.warning(
+                    "⚠️ Попытка %d/%d не удалась (trudvsem.ru). Повтор через %.1fс. URL: %s",
+                    attempt, self.MAX_RETRIES, self.RETRY_DELAY, url,
+                )
+                await asyncio.sleep(self.RETRY_DELAY)
+        return result
+
     def _create_vacancies_tasks(self, request_url: str, count_pages: int) -> list:
         """Создает список задач (корутин) для запроса вакансий."""
         return [
-            self._request_to_api_tv(
+            self._request_with_retry(
                 url=request_url,
                 params={
                     "social_protected": self.SOCIAL_PROTECTED,
@@ -79,7 +97,6 @@ class TVClient:
             for page in range(1, count_pages)
         ]
 
-    # TODO: посмотреть, что тут не так с исключенияями
     async def _get_many_vacancies_in_region(
         self,
         request_url: str,
@@ -88,42 +105,30 @@ class TVClient:
         first_page_vacancies: list[dict]
     ) -> list[dict]:
         """Получение данных вакансий в регионе по нескольким страницам."""
-        try:
-            tasks = self._create_vacancies_tasks(request_url, count_pages)
+        tasks = self._create_vacancies_tasks(request_url, count_pages)
+        results: list = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # Параллельное выполнение всех запросов
-            vacancies_request_result: list[dict] = await asyncio.gather(*tasks, return_exceptions=True)
-            for result in vacancies_request_result:
-                try:
-                    status = result.get("status")
-                    response_data: dict = result.get("response_data")
-                    if not status:
-                        raise TVAPIRequestError(
-                            error_details="Ошибка при загрузке вакансий (многостраничный запрос).",
-                            request_url=request_url,
-                            request_params={
-                                "social_protected": self.SOCIAL_PROTECTED,
-                                "region_code_tv": region_code_tv,
-                            }
-                        )
-                    vacancies_for_page: list = response_data.get("results", {}).get("vacancies", [])
-                    first_page_vacancies.extend(vacancies_for_page)
-                except Exception as error:
-                    logger.error(
-                        "❌ Ошибка при обработке данных API trudvsem.ru. Детали: %s, результат: %s",
-                        error, result, exc_info=True,
-                    )
-                    raise TVAPIRequestError(
-                        error_details="Ошибка при загрузке вакансий (многостраничный запрос).",
-                        request_url=request_url,
-                        request_params={
-                            "social_protected": self.SOCIAL_PROTECTED,
-                            "region_code_tv": region_code_tv,
-                        }
-                    )
-            return first_page_vacancies
-        except TVAPIRequestError:
-            raise
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(
+                    "❌ Ошибка при параллельной загрузке страниц trudvsem.ru: %s",
+                    result, exc_info=result,
+                )
+                raise TVAPIRequestError(
+                    error_details=f"Ошибка при загрузке вакансий (многостраничный запрос): {result}",
+                    request_url=request_url,
+                    request_params={"social_protected": self.SOCIAL_PROTECTED, "region_code_tv": region_code_tv},
+                )
+            if not result.get("status"):
+                raise TVAPIRequestError(
+                    error_details="Ошибка ответа API при загрузке вакансий (многостраничный запрос).",
+                    request_url=request_url,
+                    request_params={"social_protected": self.SOCIAL_PROTECTED, "region_code_tv": region_code_tv},
+                )
+            vacancies_for_page: list = result.get("response_data", {}).get("results", {}).get("vacancies", [])
+            first_page_vacancies.extend(vacancies_for_page)
+
+        return first_page_vacancies
 
     async def get_vacancies_in_region(self, region_code_tv: str) -> list[dict]:
         """Получение данных вакансий в регионе."""
